@@ -1,180 +1,571 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arepas al Fuego - Sistema de Gestión</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arepas al Fuego - Sistema de Gestión</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <div id="root"></div>
-    
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        const { createClient } = supabase;
-        
-        const supabaseClient = createClient(
-            'https://xybyupmrtiyspxlzcaug.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Ynl1cG1ydGl5c3B4bHpjYXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODk3MDYsImV4cCI6MjA3NTQ2NTcwNn0.EHS9tI0-2vllcfdU-W4zeCVWf7csG24CtVmUbmk7s1M'
-        );
+  <div id="root"></div>
 
-        const formatPeso = (amount) => `$${Math.round(amount || 0).toLocaleString('es-CO')}`;
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const { createClient } = supabase;
 
-        function App() {
-            const [user, setUser] = useState(null);
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [clientes, setClientes] = useState([]);
-            const [ventas, setVentas] = useState([]);
-            const [ingresos, setIngresos] = useState([]);
-            const [egresos, setEgresos] = useState([]);
-            const [filterDesde, setFilterDesde] = useState('');
-            const [filterHasta, setFilterHasta] = useState('');
+    // --- CONFIGURA TU SUPABASE ---
+    const SUPABASE_URL = 'https://xybyupmrtiyspxlzcaug.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Ynl1cG1ydGl5c3B4bHpjYXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODk3MDYsImV4cCI6MjA3NTQ2NTcwNn0.EHS9tI0-2vllcfdU-W4zeCVWf7csG24CtVmUbmk7s1M';
 
-            useEffect(()=>{init();},[]);
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-            const init = async () => {
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (!session) { setUser('anon'); return; }
-                setUser(session.user);
-                const { data: cl } = await supabaseClient.from('clientes').select('*');
-                const { data: vs } = await supabaseClient.from('ventas').select('*,clientes(nombre,tipo_cliente)').order('fecha',{ascending:false});
-                const { data: ing } = await supabaseClient.from('ingresos').select('*');
-                const { data: egr } = await supabaseClient.from('egresos').select('*');
-                setClientes(cl||[]);
-                setVentas(vs||[]);
-                setIngresos(ing||[]);
-                setEgresos(egr||[]);
-            };
+    const formatPeso = (amount) => `$${Math.round(amount || 0).toLocaleString('es-CO')}`;
 
-            const updateTipoCliente = async (id, tipo) => {
-                await supabaseClient.from('clientes').update({tipo_cliente:tipo}).eq('id', id);
-                setClientes(clientes.map(c=>c.id===id?{...c,tipo_cliente:tipo}:c));
-            };
+    // Simple toast notifications
+    function Toast({toasts, remove}){
+      return (
+        <div className="fixed bottom-6 right-6 space-y-2 z-50">
+          {toasts.map(t=> (
+            <div key={t.id} className={`px-4 py-2 rounded shadow flex items-center gap-3 ${t.type==='success'?'bg-green-500 text-white':t.type==='error'?'bg-red-500 text-white':'bg-yellow-400 text-black'}`}>
+              <div>{t.icon}</div>
+              <div className="text-sm">{t.message}</div>
+              <button onClick={()=>remove(t.id)} className="ml-2 opacity-80">✖</button>
+            </div>
+          ))}
+        </div>
+      );
+    }
 
-            const updateEstadoPago = async (v, estado, abono) => {
-                const total = parseFloat(v.total)||0;
-                const abActual = parseFloat(v.abono)||0;
-                const abNuevo = abActual + (parseFloat(abono)||0);
-                const saldo = total - abNuevo;
-                let nuevoEstado = estado;
-                if(estado==='Abono' && saldo<=0) nuevoEstado='Pagado';
+    function App(){
+      const [user, setUser] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [activeTab, setActiveTab] = useState('dashboard');
 
-                await supabaseClient.from('ventas').update({estado_pago:nuevoEstado, abono:abNuevo}).eq('id',v.id);
-                if(estado==='Abono' && abono>0){
-                    await supabaseClient.from('ingresos').insert([{concepto:`Abono - ${v.clientes?.nombre}`,monto:parseFloat(abono),categoria:'Abono',fecha:new Date().toISOString()}]);
-                }
-                if(estado==='Pagado'){
-                    await supabaseClient.from('ingresos').insert([{concepto:`Venta - ${v.clientes?.nombre}`,monto:total,categoria:'Venta',fecha:new Date().toISOString()}]);
-                }
-                setVentas(ventas.map(x=>x.id===v.id?{...x,estado_pago:nuevoEstado,abono:abNuevo}:x));
-            };
+      // data
+      const [clientes, setClientes] = useState([]);
+      const [ventas, setVentas] = useState([]);
+      const [ingresos, setIngresos] = useState([]);
+      const [egresos, setEgresos] = useState([]);
 
-            const calcularResumen = () => {
-                const desde = filterDesde ? new Date(filterDesde) : new Date('2000-01-01');
-                const hasta = filterHasta ? new Date(filterHasta) : new Date();
+      // forms
+      const [clienteForm, setClienteForm] = useState({nombre:'',direccion:'',tipo_cliente:'Individual',dia_entrega:'',precio_especial:'',notas:''});
+      const [ventaForm, setVentaForm] = useState({cliente_id:'',semana:'',tipo_venta:'Individual',cantidad:'',tipo_cantidad:'Unidades',precio_unitario:'',precio_sugerido:'',total:'',estado_pago:'Pendiente',fecha:'',payment_type:'Total',abono:'',notas:''});
+      const [ingresoForm, setIngresoForm] = useState({concepto:'',monto:'',categoria:'',fecha:''});
+      const [egresoForm, setEgresoForm] = useState({concepto:'',monto:'',categoria:'',fecha:''});
 
-                const filtrarFecha = (f) => {
-                    const fecha = new Date(f);
-                    return fecha >= desde && fecha <= hasta;
-                };
+      // filtros y resumen
+      const [filterDate, setFilterDate] = useState('');
+      const [filterEstado, setFilterEstado] = useState('Todos');
+      const [resDesde, setResDesde] = useState('');
+      const [resHasta, setResHasta] = useState('');
 
-                const ventasFiltradas = ventas.filter(v => v.fecha && filtrarFecha(v.fecha));
-                const ingresosFiltrados = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha));
-                const egresosFiltrados = egresos.filter(e => e.fecha && filtrarFecha(e.fecha));
+      // toasts
+      const [toasts, setToasts] = useState([]);
+      const pushToast = (msg, type='success')=>{
+        const id = Date.now()+Math.random();
+        const icon = type==='success'?'✔':type==='error'?'✖':'⚠';
+        setToasts(t=>[...t,{id,message:msg,type,icon}]);
+        setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),5000);
+      };
+      const removeToast = (id)=> setToasts(t=>t.filter(x=>x.id!==id));
 
-                const totalVentas = ventasFiltradas.reduce((s,v)=>s+(parseFloat(v.total)||0),0);
-                const totalAbonos = ventasFiltradas.reduce((s,v)=>s+(parseFloat(v.abono)||0),0);
-                const totalSaldo = totalVentas - totalAbonos;
-                const totalIngresos = ingresosFiltrados.reduce((s,i)=>s+(parseFloat(i.monto)||0),0);
-                const totalEgresos = egresosFiltrados.reduce((s,e)=>s+(parseFloat(e.monto)||0),0);
+      useEffect(()=>{ checkUserAndLoad(); }, []);
 
-                return {totalVentas,totalAbonos,totalSaldo,totalIngresos,totalEgresos};
-            };
+      const checkUserAndLoad = async ()=>{
+        setLoading(true);
+        const { data:{ session } } = await supabaseClient.auth.getSession();
+        // keep anonymous allowed in your original flow
+        setUser(session?.user || {email:'anon@local'});
+        await loadData();
+        setLoading(false);
+      };
 
-            const resumen = calcularResumen();
+      const loadData = async ()=>{
+        try{
+          const { data: cl } = await supabaseClient.from('clientes').select('*').order('created_at',{ascending:false});
+          const { data: vs } = await supabaseClient.from('ventas').select('*, clientes(nombre)').order('fecha',{ascending:false});
+          const { data: ing } = await supabaseClient.from('ingresos').select('*').order('fecha',{ascending:false});
+          const { data: egr } = await supabaseClient.from('egresos').select('*').order('fecha',{ascending:false});
+          setClientes(cl||[]);
+          setVentas(vs||[]);
+          setIngresos(ing||[]);
+          setEgresos(egr||[]);
+        }catch(err){ console.error(err); pushToast('Error cargando datos','error'); }
+      };
 
-            return (
-                <div className="min-h-screen bg-amber-50">
-                    <div className="bg-gradient-to-r from-amber-700 via-orange-600 to-yellow-700 text-white p-6">
-                        <div className="max-w-7xl mx-auto flex justify-between items-center">
-                            <h1 className="text-2xl font-bold">Arepas al Fuego - Sistema</h1>
-                        </div>
-                    </div>
+      // ---- CLIENTES ----
+      const addCliente = async (e)=>{ e.preventDefault();
+        const payload = { ...clienteForm, activo:true };
+        const { error } = await supabaseClient.from('clientes').insert([payload]);
+        if(error) { pushToast('Error al agregar cliente','error'); console.error(error); }
+        else { pushToast('Cliente agregado'); setClienteForm({nombre:'',direccion:'',tipo_cliente:'Individual',dia_entrega:'',precio_especial:'',notas:''}); loadData(); }
+      };
 
-                    <div className="flex border-b bg-white shadow-sm sticky top-0 z-10 overflow-x-auto">
-                        {[{id:'dashboard',label:'Inicio'},{id:'clientes',label:'Clientes'},{id:'ventas',label:'Ventas'},{id:'contabilidad',label:'Contabilidad'},{id:'resumen',label:'Resumen'}].map(tab=>(
-                            <button key={tab.id} onClick={()=>setActiveTab(tab.id)} className={`px-6 py-4 ${activeTab===tab.id?'border-b-2 border-orange-600 text-orange-600':'text-gray-600'}`}>{tab.label}</button>
-                        ))}
-                    </div>
+      const updateTipoCliente = async (id, tipo) => {
+        await supabaseClient.from('clientes').update({tipo_cliente:tipo}).eq('id', id);
+        setClientes(cs=>cs.map(c=>c.id===id?{...c,tipo_cliente:tipo}:c));
+        pushToast('Tipo de cliente actualizado','success');
+      };
 
-                    <div className="max-w-7xl mx-auto p-4">
-                        {activeTab==='clientes' && (
-                            <div className="bg-white p-6 rounded shadow">
-                                <h2 className="font-bold">Clientes</h2>
-                                <table className="w-full mt-3">
-                                    <thead><tr><th>Nombre</th><th>Tipo</th><th>Cambiar</th></tr></thead>
-                                    <tbody>
-                                        {clientes.map(c=>(
-                                            <tr key={c.id} className="border-t"><td>{c.nombre}</td><td>{c.tipo_cliente}</td><td>
-                                                <select value={c.tipo_cliente} onChange={e=>updateTipoCliente(c.id,e.target.value)} className="p-1 border rounded">
-                                                    <option>Individual</option><option>Contrato</option>
-                                                </select>
-                                            </td></tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+      const deleteCliente = async (id)=>{
+        if(!confirm('¿Eliminar cliente? Se marcará inactivo y no se borrarán ventas.')) return;
+        await supabaseClient.from('clientes').update({activo:false}).eq('id',id);
+        pushToast('Cliente marcado como inactivo','success');
+        loadData();
+      };
 
-                        {activeTab==='resumen' && (
-                            <div className="bg-white p-6 rounded shadow space-y-4">
-                                <h2 className="font-bold text-xl">Resumen General</h2>
-                                <div className="flex gap-2">
-                                    <div>
-                                        <label>Desde:</label>
-                                        <input type="date" value={filterDesde} onChange={e=>setFilterDesde(e.target.value)} className="border p-2 rounded ml-1" />
-                                    </div>
-                                    <div>
-                                        <label>Hasta:</label>
-                                        <input type="date" value={filterHasta} onChange={e=>setFilterHasta(e.target.value)} className="border p-2 rounded ml-1" />
-                                    </div>
-                                    <button onClick={()=>{setFilterDesde('');setFilterHasta('');}} className="px-3 py-1 border rounded">Limpiar</button>
-                                </div>
+      // ---- VENTAS ----
+      useEffect(()=>{
+        if(ventaForm.cantidad && ventaForm.tipo_cantidad){
+          const cantidad = parseInt(ventaForm.cantidad)||0;
+          if(ventaForm.tipo_cantidad==='Unidades'){
+            const sugerido = cantidad * 600;
+            setVentaForm(v=>({...v,precio_unitario:600,precio_sugerido:sugerido}));
+          }else{
+            const sugerido = cantidad * 6000;
+            setVentaForm(v=>({...v,precio_unitario:6000,precio_sugerido:sugerido}));
+          }
+        }
+      },[ventaForm.cantidad, ventaForm.tipo_cantidad]);
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                                    <div className="bg-amber-50 p-4 rounded shadow">
-                                        <p className="font-bold">Total Ventas</p>
-                                        <p>{formatPeso(resumen.totalVentas)}</p>
-                                    </div>
-                                    <div className="bg-green-50 p-4 rounded shadow">
-                                        <p className="font-bold">Total Abonos</p>
-                                        <p>{formatPeso(resumen.totalAbonos)}</p>
-                                    </div>
-                                    <div className="bg-yellow-50 p-4 rounded shadow">
-                                        <p className="font-bold">Saldo Pendiente</p>
-                                        <p>{formatPeso(resumen.totalSaldo)}</p>
-                                    </div>
-                                    <div className="bg-blue-50 p-4 rounded shadow">
-                                        <p className="font-bold">Ingresos</p>
-                                        <p>{formatPeso(resumen.totalIngresos)}</p>
-                                    </div>
-                                    <div className="bg-red-50 p-4 rounded shadow">
-                                        <p className="font-bold">Egresos</p>
-                                        <p>{formatPeso(resumen.totalEgresos)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
+      const addVenta = async (e)=>{ e.preventDefault();
+        const total = parseFloat(ventaForm.total)||0;
+        const abono = parseFloat(ventaForm.abono)||0;
+        const fechaISO = ventaForm.fecha ? new Date(ventaForm.fecha).toISOString() : new Date().toISOString();
+        const payload = { cliente_id: parseInt(ventaForm.cliente_id), semana:ventaForm.semana, tipo_venta:ventaForm.tipo_venta, cantidad:parseInt(ventaForm.cantidad)||0, tipo_cantidad:ventaForm.tipo_cantidad, precio_unitario:parseFloat(ventaForm.precio_unitario)||0, total:total, estado_pago:ventaForm.estado_pago, fecha:fechaISO, payment_type:ventaForm.payment_type, abono:abono, notas:ventaForm.notas, usuario_id:user?.id };
+        const { error } = await supabaseClient.from('ventas').insert([payload]);
+        if(error){ pushToast('Error al registrar venta','error'); console.error(error); return; }
+
+        // registrar ingreso si pagado o abono
+        if(ventaForm.estado_pago==='Pagado'){
+          await supabaseClient.from('ingresos').insert([{concepto:`Venta - ${clienteDisplay(ventaForm.cliente_id)}`,monto:total,categoria:'Venta',fecha:fechaISO}]);
+        }else if(abono>0){
+          await supabaseClient.from('ingresos').insert([{concepto:`Abono - ${clienteDisplay(ventaForm.cliente_id)}`,monto:abono,categoria:'Abono',fecha:fechaISO}]);
         }
 
-        ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
+        pushToast('Venta registrada');
+        setVentaForm({cliente_id:'',semana:'',tipo_venta:'Individual',cantidad:'',tipo_cantidad:'Unidades',precio_unitario:'',precio_sugerido:'',total:'',estado_pago:'Pendiente',fecha:'',payment_type:'Total',abono:'',notas:''});
+        loadData();
+      };
+
+      const deleteVenta = async (id)=>{ if(!confirm('¿Eliminar esta venta?')) return; await supabaseClient.from('ventas').delete().eq('id',id); pushToast('Venta eliminada','error'); loadData(); };
+
+      // cambiar estado o abono en lista
+      const setPagoVenta = async (v, action, abonoMonto=0)=>{
+        const total = parseFloat(v.total)||0;
+        const actualAbono = parseFloat(v.abono)||0;
+        if(action==='Pagado'){
+          await supabaseClient.from('ventas').update({estado_pago:'Pagado',abono:total}).eq('id',v.id);
+          await supabaseClient.from('ingresos').insert([{concepto:`Venta - ${v.clientes?.nombre}`,monto:total,categoria:'Venta',fecha:new Date().toISOString()}]);
+          pushToast('Venta marcada como pagada','success');
+        }else if(action==='Abono'){
+          const nuevoAbono = actualAbono + (parseFloat(abonoMonto)||0);
+          const nuevoEstado = (total - nuevoAbono) <= 0 ? 'Pagado' : 'Abono';
+          await supabaseClient.from('ventas').update({abono:nuevoAbono,estado_pago:nuevoEstado}).eq('id',v.id);
+          await supabaseClient.from('ingresos').insert([{concepto:`Abono - ${v.clientes?.nombre}`,monto:parseFloat(abonoMonto)||0,categoria:'Abono',fecha:new Date().toISOString()}]);
+          pushToast('Abono registrado','success');
+        }else{
+          await supabaseClient.from('ventas').update({estado_pago:'Pendiente'}).eq('id',v.id);
+          pushToast('Venta marcada como pendiente','success');
+        }
+        loadData();
+      };
+
+      // editar/eliminar abonos: buscamos en ingresos con categoria 'Abono' relacionados por concepto que contenga venta cliente y monto
+      const editAbono = async (venta, nuevoMonto) => {
+        // esto asume que cada abono generó una fila en ingresos con 'Abono - Cliente'
+        // para simplificar actualizamos la venta y añadimos un registro compensatorio
+        if(!confirm('Editar abono ajustará registros. Confirmar.')) return;
+        const diff = parseFloat(nuevoMonto) - (parseFloat(venta.abono)||0);
+        await supabaseClient.from('ventas').update({abono:parseFloat(nuevoMonto)||0, estado_pago: (parseFloat(venta.total)||0 - parseFloat(nuevoMonto)||0) <=0 ? 'Pagado' : 'Abono'}).eq('id',venta.id);
+        if(diff>0) await supabaseClient.from('ingresos').insert([{concepto:`Abono - ${venta.clientes?.nombre}`,monto:diff,categoria:'Abono',fecha:new Date().toISOString()}]);
+        pushToast('Abono editado','success');
+        loadData();
+      };
+
+      const deleteAbonoRecord = async (venta) => {
+        if(!confirm('Eliminar abono reducirá el monto abonado. Confirmar.')) return;
+        // simplificación: restablecemos abono a 0 en venta y creamos un egreso de ajuste (registro manual recomendado en tu DB)
+        await supabaseClient.from('ventas').update({abono:0, estado_pago:'Pendiente'}).eq('id',venta.id);
+        await supabaseClient.from('egresos').insert([{concepto:`Ajuste eliminación abono - ${venta.clientes?.nombre}`,monto:(parseFloat(venta.abono)||0),categoria:'Ajuste',fecha:new Date().toISOString()}]);
+        pushToast('Abono eliminado','error');
+        loadData();
+      };
+
+      // ---- INGRESOS / EGRESOS ----
+      const addIngreso = async (e)=>{ e.preventDefault(); const fechaISO = ingresoForm.fecha ? new Date(ingresoForm.fecha).toISOString() : new Date().toISOString(); const { error } = await supabaseClient.from('ingresos').insert([{ concepto:ingresoForm.concepto, monto:parseFloat(ingresoForm.monto)||0, categoria:ingresoForm.categoria, fecha:fechaISO }]); if(error){ pushToast('Error al agregar ingreso','error'); } else { pushToast('Ingreso agregado'); setIngresoForm({concepto:'',monto:'',categoria:'',fecha:''}); loadData(); } };
+      const addEgreso = async (e)=>{ e.preventDefault(); const fechaISO = egresoForm.fecha ? new Date(egresoForm.fecha).toISOString() : new Date().toISOString(); const { error } = await supabaseClient.from('egresos').insert([{ concepto:egresoForm.concepto, monto:parseFloat(egresoForm.monto)||0, categoria:egresoForm.categoria, fecha:fechaISO }]); if(error){ pushToast('Error al agregar egreso','error'); } else { pushToast('Egreso agregado'); setEgresoForm({concepto:'',monto:'',categoria:'',fecha:''}); loadData(); } };
+      const deleteIngreso = async (id)=>{ if(!confirm('¿Eliminar?')) return; await supabaseClient.from('ingresos').delete().eq('id',id); pushToast('Ingreso eliminado','error'); loadData(); };
+      const deleteEgreso = async (id)=>{ if(!confirm('¿Eliminar?')) return; await supabaseClient.from('egresos').delete().eq('id',id); pushToast('Egreso eliminado','error'); loadData(); };
+
+      // permitir cambiar fecha
+      const updateFechaVenta = async (id, fecha) => { const fechaISO = fecha ? new Date(fecha).toISOString() : null; await supabaseClient.from('ventas').update({ fecha: fechaISO }).eq('id', id); pushToast('Fecha de venta actualizada','success'); loadData(); };
+      const updateFechaIngreso = async (id, fecha) => { const fechaISO = fecha ? new Date(fecha).toISOString() : null; await supabaseClient.from('ingresos').update({ fecha: fechaISO }).eq('id', id); pushToast('Fecha de ingreso actualizada','success'); loadData(); };
+      const updateFechaEgreso = async (id, fecha) => { const fechaISO = fecha ? new Date(fecha).toISOString() : null; await supabaseClient.from('egresos').update({ fecha: fechaISO }).eq('id', id); pushToast('Fecha de egreso actualizada','success'); loadData(); };
+
+      // Helper
+      const clienteDisplay = (id)=>{ const c = clientes.find(x=>x.id===parseInt(id)); return c?.nombre||'Cliente'; };
+
+      // filtros y agrupación
+      const ventasFiltradas = ventas.filter(v=>{
+        if(filterDate){ if(!v.fecha) return false; if(v.fecha.slice(0,10)!==filterDate) return false; }
+        if(filterEstado==='Pagadas') return v.estado_pago==='Pagado';
+        if(filterEstado==='Pendientes') return v.estado_pago==='Pendiente';
+        return true;
+      });
+
+      const ventasAgrupadasPor = (mode) =>{
+        // mode: 'dia' or 'semana'
+        const arr = ventas.filter(v=>v.fecha);
+        const grupos = {};
+        arr.forEach(v=>{
+          const fecha = v.fecha.slice(0,10);
+          let clave = fecha;
+          if(mode==='semana'){
+            // ISO week (simple approximation: use semana field if provided)
+            clave = v.semana || fecha;
+          }
+          if(!grupos[clave]) grupos[clave]=[];
+          grupos[clave].push(v);
+        });
+        return grupos;
+      };
+
+      // resumen por rango
+      const calcularResumen = () => {
+        const desde = resDesde ? new Date(resDesde) : new Date('2000-01-01');
+        const hasta = resHasta ? new Date(resHasta) : new Date();
+        const filtrarFecha = (f) => { const fecha = new Date(f); return fecha >= desde && fecha <= hasta; };
+        const ventasFil = ventas.filter(v=>v.fecha && filtrarFecha(v.fecha));
+        const ingFil = ingresos.filter(i=>i.fecha && filtrarFecha(i.fecha));
+        const egrFil = egresos.filter(e=>e.fecha && filtrarFecha(e.fecha));
+        const totalVentas = ventasFil.reduce((s,v)=>(s + (parseFloat(v.total)||0)),0);
+        const totalAbonos = ventasFil.reduce((s,v)=>(s + (parseFloat(v.abono)||0)),0);
+        const totalSaldo = totalVentas - totalAbonos;
+        const totalIngresos = ingFil.reduce((s,i)=>(s + (parseFloat(i.monto)||0)),0);
+        const totalEgresos = egrFil.reduce((s,e)=>(s + (parseFloat(e.monto)||0)),0);
+        return { totalVentas, totalAbonos, totalSaldo, totalIngresos, totalEgresos };
+      };
+
+      const resumen = calcularResumen();
+
+      if(loading) return <div className="min-h-screen flex items-center justify-center">Cargando...</div>;
+
+      // ---- UI ----
+      return (
+        <div className="min-h-screen bg-amber-50">
+          <div className="bg-gradient-to-r from-amber-700 via-orange-600 to-yellow-700 text-white p-6">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-bold">Arepas al Fuego - Sistema</h1>
+                <p className="text-sm">Usuario: {user?.email}</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={()=>{ supabaseClient.auth.signOut(); setUser(null); pushToast('Sesión cerrada','success'); }} className="bg-white/20 px-3 py-1 rounded">Cerrar sesión</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex border-b bg-white shadow-sm sticky top-0 z-10 overflow-x-auto">
+            {[
+              { id: 'dashboard', label: 'Inicio' },
+              { id: 'clientes', label: 'Clientes' },
+              { id: 'ventas', label: 'Ventas' },
+              { id: 'contabilidad', label: 'Contabilidad' },
+              { id: 'resumen', label: 'Resumen' }
+            ].map(tab => (
+              <button key={tab.id} onClick={()=>{ setActiveTab(tab.id); setFilterDate(''); setFilterEstado('Todos'); }} className={`px-6 py-4 ${activeTab===tab.id ? 'border-b-2 border-orange-600 text-orange-600' : 'text-gray-600'}`}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="max-w-7xl mx-auto p-4">
+            {activeTab === 'dashboard' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-6 rounded shadow">Clientes: {clientes.filter(c=>c.activo!==false).length}</div>
+                <div className="bg-white p-6 rounded shadow">Ventas registradas: {ventas.length}</div>
+                <div className="bg-white p-6 rounded shadow">Ingresos: {formatPeso(ingresos.reduce((s,i)=>s+(parseFloat(i.monto)||0),0))}</div>
+                <div className="bg-white p-6 rounded shadow">Egresos: {formatPeso(egresos.reduce((s,e)=>s+(parseFloat(e.monto)||0),0))}</div>
+                <div className="bg-white p-6 rounded shadow">Balance: {formatPeso(ingresos.reduce((s,i)=>s+(parseFloat(i.monto)||0),0) - egresos.reduce((s,e)=>s+(parseFloat(e.monto)||0),0))}</div>
+              </div>
+            )}
+
+            {activeTab === 'clientes' && (
+              <div className="space-y-6">
+                <div className="bg-white p-6 rounded shadow">
+                  <h2 className="font-bold">Agregar Cliente</h2>
+                  <form onSubmit={addCliente} className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
+                    <input value={clienteForm.nombre} onChange={(e)=>setClienteForm({...clienteForm, nombre:e.target.value})} placeholder="Nombre" className="p-2 border rounded" required />
+                    <input value={clienteForm.direccion} onChange={(e)=>setClienteForm({...clienteForm, direccion:e.target.value})} placeholder="Dirección" className="p-2 border rounded" />
+                    <select value={clienteForm.dia_entrega} onChange={(e)=>setClienteForm({...clienteForm, dia_entrega:e.target.value})} className="p-2 border rounded">
+                      <option value="">Día de entrega</option>
+                      <option value="Viernes">Viernes</option>
+                      <option value="Sábado">Sábado</option>
+                      <option value="Domingo">Domingo</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                    <input value={clienteForm.precio_especial} onChange={(e)=>setClienteForm({...clienteForm, precio_especial:e.target.value})} placeholder="Precio especial" className="p-2 border rounded" />
+                    <input value={clienteForm.notas} onChange={(e)=>setClienteForm({...clienteForm, notas:e.target.value})} placeholder="Notas" className="p-2 border rounded md:col-span-2" />
+                    <div className="md:col-span-3">
+                      <button type="submit" className="bg-amber-600 text-white p-2 rounded">Agregar</button>
+                    </div>
+                  </form>
+                </div>
+
+                <div className="bg-white p-6 rounded shadow">
+                  <h2 className="font-bold">Lista de Clientes</h2>
+                  <table className="w-full mt-3">
+                    <thead><tr><th>Nombre</th><th>Tipo</th><th>Día</th><th>Acción</th></tr></thead>
+                    <tbody>
+                      {clientes.filter(c=>c.activo!==false).map(c=> (
+                        <tr key={c.id} className="border-t"><td className="p-2">{c.nombre}</td><td className="p-2">{c.tipo_cliente || 'Individual'}</td><td className="p-2">{c.dia_entrega || '-'}</td><td className="p-2 flex gap-2 items-center">
+                          <select value={c.tipo_cliente || 'Individual'} onChange={(e)=>updateTipoCliente(c.id, e.target.value)} className="p-1 border rounded">
+                            <option>Individual</option><option>Contrato</option>
+                          </select>
+                          <button onClick={()=>deleteCliente(c.id)} className="text-red-600">Eliminar</button>
+                        </td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'ventas' && (
+              <div className="space-y-6">
+                <div className="bg-white p-6 rounded shadow">
+                  <h2 className="font-bold">Registrar Venta</h2>
+                  <form onSubmit={addVenta} className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
+                    <select value={ventaForm.cliente_id} onChange={(e)=>setVentaForm({...ventaForm, cliente_id:e.target.value})} required className="p-2 border rounded">
+                      <option value="">Seleccionar cliente</option>
+                      {clientes.filter(c=>c.activo!==false).map(c=>(<option key={c.id} value={c.id}>{c.nombre}</option>))}
+                    </select>
+                    <input value={ventaForm.semana} onChange={(e)=>setVentaForm({...ventaForm, semana:e.target.value})} placeholder="Semana" className="p-2 border rounded" />
+                    <select value={ventaForm.tipo_cantidad} onChange={(e)=>setVentaForm({...ventaForm, tipo_cantidad:e.target.value, cantidad:'', total:''})} className="p-2 border rounded">
+                      <option value="Unidades">Unidades ($600 c/u)</option>
+                      <option value="Paquetes">Paquetes ($6,000 c/u)</option>
+                    </select>
+
+                    <input type="number" min="1" value={ventaForm.cantidad} onChange={(e)=>setVentaForm({...ventaForm, cantidad:e.target.value})} placeholder="Cantidad" className="p-2 border rounded" required />
+                    <input type="date" value={ventaForm.fecha} onChange={(e)=>setVentaForm({...ventaForm, fecha:e.target.value})} className="p-2 border rounded" />
+                    <select value={ventaForm.payment_type} onChange={(e)=>setVentaForm({...ventaForm, payment_type:e.target.value})} className="p-2 border rounded">
+                      <option value="Total">Pago Total</option>
+                      <option value="Parcial">Pago Parcial</option>
+                    </select>
+
+                    {ventaForm.precio_sugerido > 0 && (<div className="p-2 md:col-span-3 bg-blue-50 border rounded">Precio sugerido: {formatPeso(ventaForm.precio_sugerido)} <button type="button" onClick={()=>setVentaForm({...ventaForm, total:ventaForm.precio_sugerido})} className="ml-2 px-2 py-1 bg-blue-600 text-white rounded">Usar</button></div>)}
+
+                    <input type="number" placeholder="Total" value={ventaForm.total} onChange={(e)=>setVentaForm({...ventaForm, total:e.target.value})} className="p-2 border rounded" required />
+                    <input type="number" placeholder="Abono (si aplica)" value={ventaForm.abono} onChange={(e)=>setVentaForm({...ventaForm, abono:e.target.value})} className="p-2 border rounded" />
+
+                    <select value={ventaForm.estado_pago} onChange={(e)=>setVentaForm({...ventaForm, estado_pago:e.target.value})} className="p-2 border rounded">
+                      <option value="Pendiente">Pendiente</option>
+                      <option value="Pagado">Pagado</option>
+                    </select>
+                    <input value={ventaForm.notas} onChange={(e)=>setVentaForm({...ventaForm, notas:e.target.value})} placeholder="Notas" className="p-2 border rounded md:col-span-2" />
+
+                    <button type="submit" className="bg-orange-600 text-white p-2 rounded md:col-span-3">Registrar Venta</button>
+                  </form>
+                </div>
+
+                <div className="bg-white p-6 rounded shadow">
+                  <h2 className="font-bold">Filtros</h2>
+                  <div className="flex gap-2 items-center mt-2">
+                    <input type="date" value={filterDate} onChange={(e)=>setFilterDate(e.target.value)} className="p-2 border rounded" />
+                    <select value={filterEstado} onChange={(e)=>setFilterEstado(e.target.value)} className="p-2 border rounded">
+                      <option value="Todos">Todos</option>
+                      <option value="Pagadas">Pagadas</option>
+                      <option value="Pendientes">Pendientes</option>
+                    </select>
+                    <button onClick={()=>{ setFilterDate(''); setFilterEstado('Todos'); }} className="px-3 py-1 border rounded">Limpiar</button>
+                  </div>
+
+                  <div className="mt-4 p-3 bg-amber-50 rounded">
+                    {filterDate && (
+                      (()=>{
+                        const ventasPorFecha = ventas.filter(v=>v.fecha && v.fecha.slice(0,10)===filterDate);
+                        const total = ventasPorFecha.reduce((s,v)=>s+(parseFloat(v.total)||0),0);
+                        const unidades = ventasPorFecha.reduce((s,v)=>{
+                          if(v.tipo_cantidad==='Paquetes') return s + ((parseInt(v.cantidad)||0)*10);
+                          return s + (parseInt(v.cantidad)||0);
+                        },0);
+                        return (
+                          <div>
+                            <p className="font-bold">Ventas para {filterDate}</p>
+                            <p>Total ventas: {formatPeso(total)}</p>
+                            <p>Unidades vendidas: {unidades} (Paquetes equivalentes: {Math.floor(unidades/10)} y sobrantes: {unidades % 10})</p>
+                            <div className="mt-2">
+                              {ventasPorFecha.map(v=>(
+                                <div key={v.id} className="flex justify-between p-2 border-b">
+                                  <div>{v.clientes?.nombre || 'N/A'} - {v.cantidad} {v.tipo_cantidad}</div>
+                                  <div>{formatPeso(v.total)}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()
+                    )}
+                  </div>
+
+                  <div className="overflow-x-auto mt-4">
+                    <table className="w-full">
+                      <thead><tr><th>Cliente</th><th>Semana</th><th>Cantidad</th><th>Total</th><th>Abono</th><th>Saldo</th><th>Estado</th><th>Fecha</th><th>Acción</th></tr></thead>
+                      <tbody>
+                        {ventasFiltradas.map(v => {
+                          const saldo = (parseFloat(v.total)||0) - (parseFloat(v.abono)||0);
+                          return (
+                            <tr key={v.id} className="border-t">
+                              <td className="p-2">{v.clientes?.nombre || 'N/A'}</td>
+                              <td className="p-2">{v.semana || '-'}</td>
+                              <td className="p-2">{v.cantidad} {v.tipo_cantidad}</td>
+                              <td className="p-2 text-green-600">{formatPeso(v.total)}</td>
+                              <td className="p-2">{formatPeso(v.abono||0)}</td>
+                              <td className="p-2">{formatPeso(saldo)}</td>
+                              <td className="p-2">
+                                <div className="flex gap-2 items-center">
+                                  <button onClick={()=>{
+                                    if(v.estado_pago==='Pagado'){ setPagoVenta(v,'Pendiente'); }
+                                    else { setPagoVenta(v,'Pagado'); }
+                                  }} className={`px-2 py-1 rounded ${v.estado_pago==='Pagado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{v.estado_pago==='Pagado'? 'Pagado':'Pendiente'}</button>
+                                  <button onClick={()=>{
+                                    const ab = prompt('Monto del abono:'); if(!ab) return; setPagoVenta(v,'Abono',parseFloat(ab)||0);
+                                  }} className="px-2 py-1 rounded bg-blue-100 text-blue-700">Abonar</button>
+                                </div>
+                              </td>
+                              <td className="p-2"><input type="date" defaultValue={v.fecha? v.fecha.slice(0,10):''} onBlur={(e)=>updateFechaVenta(v.id,e.target.value)} className="p-1 border rounded" /></td>
+                              <td className="p-2">
+                                <button onClick={()=>deleteVenta(v.id)} className="text-red-600 mr-2">Eliminar</button>
+                                <button onClick={()=>{ const nuevo = prompt('Nuevo monto de abono (editar)'); if(nuevo!==null) editAbono(v, parseFloat(nuevo)||0); }} className="text-sm px-2 py-1 border rounded">Editar abono</button>
+                                <button onClick={()=>deleteAbonoRecord(v)} className="text-sm px-2 py-1 border rounded ml-2">Eliminar abono</button>
+                                {v.notas && <span title={v.notas}>📝</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'contabilidad' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white p-6 rounded shadow">
+                    <h2 className="font-bold">Agregar Ingreso</h2>
+                    <form onSubmit={addIngreso} className="mt-2 grid gap-2">
+                      <input value={ingresoForm.concepto} onChange={(e)=>setIngresoForm({...ingresoForm,concepto:e.target.value})} placeholder="Concepto" className="p-2 border rounded" required />
+                      <input type="number" step="0.01" value={ingresoForm.monto} onChange={(e)=>setIngresoForm({...ingresoForm,monto:e.target.value})} placeholder="Monto" className="p-2 border rounded" required />
+                      <input type="date" value={ingresoForm.fecha} onChange={(e)=>setIngresoForm({...ingresoForm,fecha:e.target.value})} className="p-2 border rounded" />
+                      <button className="bg-green-600 text-white p-2 rounded">Agregar</button>
+                    </form>
+                  </div>
+
+                  <div className="bg-white p-6 rounded shadow">
+                    <h2 className="font-bold">Agregar Egreso</h2>
+                    <form onSubmit={addEgreso} className="mt-2 grid gap-2">
+                      <input value={egresoForm.concepto} onChange={(e)=>setEgresoForm({...egresoForm,concepto:e.target.value})} placeholder="Concepto" className="p-2 border rounded" required />
+                      <input type="number" step="0.01" value={egresoForm.monto} onChange={(e)=>setEgresoForm({...egresoForm,monto:e.target.value})} placeholder="Monto" className="p-2 border rounded" required />
+                      <input type="date" value={egresoForm.fecha} onChange={(e)=>setEgresoForm({...egresoForm,fecha:e.target.value})} className="p-2 border rounded" />
+                      <button className="bg-red-600 text-white p-2 rounded">Agregar</button>
+                    </form>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white p-6 rounded shadow">
+                    <h3 className="font-bold">Ingresos</h3>
+                    <div className="mt-2 space-y-2 max-h-96 overflow-y-auto">
+                      {ingresos.map(ing => (
+                        <div key={ing.id} className="flex justify-between items-center p-2 border rounded">
+                          <div>
+                            <div className="font-medium">{ing.concepto}</div>
+                            <input type="date" defaultValue={ing.fecha?ing.fecha.slice(0,10):''} onBlur={(e)=>updateFechaIngreso(ing.id,e.target.value)} className="p-1 border rounded mt-1" />
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <div className="font-bold">{formatPeso(ing.monto)}</div>
+                            <button onClick={()=>deleteIngreso(ing.id)} className="text-red-600">Eliminar</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded shadow">
+                    <h3 className="font-bold">Egresos</h3>
+                    <div className="mt-2 space-y-2 max-h-96 overflow-y-auto">
+                      {egresos.map(egr => (
+                        <div key={egr.id} className="flex justify-between items-center p-2 border rounded">
+                          <div>
+                            <div className="font-medium">{egr.concepto}</div>
+                            <input type="date" defaultValue={egr.fecha?egr.fecha.slice(0,10):''} onBlur={(e)=>updateFechaEgreso(egr.id,e.target.value)} className="p-1 border rounded mt-1" />
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <div className="font-bold">{formatPeso(egr.monto)}</div>
+                            <button onClick={()=>deleteEgreso(egr.id)} className="text-red-600">Eliminar</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'resumen' && (
+              <div className="bg-white p-6 rounded shadow space-y-4">
+                <h2 className="font-bold text-xl">Resumen General</h2>
+                <div className="flex gap-2">
+                  <div>
+                    <label>Desde:</label>
+                    <input type="date" value={resDesde} onChange={(e)=>setResDesde(e.target.value)} className="border p-2 rounded ml-1" />
+                  </div>
+                  <div>
+                    <label>Hasta:</label>
+                    <input type="date" value={resHasta} onChange={(e)=>setResHasta(e.target.value)} className="border p-2 rounded ml-1" />
+                  </div>
+                  <button onClick={()=>{setResDesde('');setResHasta('');}} className="px-3 py-1 border rounded">Limpiar</button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div className="bg-amber-50 p-4 rounded shadow">
+                    <p className="font-bold">Total Ventas</p>
+                    <p>{formatPeso(resumen.totalVentas)}</p>
+                  </div>
+                  <div className="bg-green-50 p-4 rounded shadow">
+                    <p className="font-bold">Total Abonos</p>
+                    <p>{formatPeso(resumen.totalAbonos)}</p>
+                  </div>
+                  <div className="bg-yellow-50 p-4 rounded shadow">
+                    <p className="font-bold">Saldo Pendiente</p>
+                    <p>{formatPeso(resumen.totalSaldo)}</p>
+                  </div>
+                  <div className="bg-blue-50 p-4 rounded shadow">
+                    <p className="font-bold">Ingresos</p>
+                    <p>{formatPeso(resumen.totalIngresos)}</p>
+                  </div>
+                  <div className="bg-red-50 p-4 rounded shadow">
+                    <p className="font-bold">Egresos</p>
+                    <p>{formatPeso(resumen.totalEgresos)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Toast toasts={toasts} remove={removeToast} />
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
 </body>
 </html>
