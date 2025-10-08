@@ -22,847 +22,149 @@
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Ynl1cG1ydGl5c3B4bHpjYXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODk3MDYsImV4cCI6MjA3NTQ2NTcwNn0.EHS9tI0-2vllcfdU-W4zeCVWf7csG24CtVmUbmk7s1M'
         );
 
-        // Función para formatear precios en pesos colombianos
-        const formatPeso = (amount) => {
-            return `$${Math.round(amount).toLocaleString('es-CO')}`;
-        };
-
-        // Componente de Login
-        function LoginScreen({ onLogin }) {
-            const [email, setEmail] = useState('');
-            const [password, setPassword] = useState('');
-            const [loading, setLoading] = useState(false);
-            const [error, setError] = useState('');
-
-            const handleLogin = async (e) => {
-                e.preventDefault();
-                setLoading(true);
-                setError('');
-
-                const { data, error } = await supabaseClient.auth.signInWithPassword({
-                    email,
-                    password
-                });
-
-                if (error) {
-                    setError('Credenciales incorrectas');
-                    setLoading(false);
-                } else {
-                    onLogin(data.user);
-                }
-            };
-
-            return (
-                <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex items-center justify-center p-4">
-                    <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full">
-                        <div className="text-center mb-8">
-                            <div className="bg-gradient-to-r from-amber-500 to-orange-500 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <span className="text-5xl">🔥</span>
-                            </div>
-                            <h1 className="text-3xl font-bold text-gray-800">Arepas al Fuego</h1>
-                            <p className="text-gray-600 mt-2">Sistema de Gestión</p>
-                        </div>
-
-                        <form onSubmit={handleLogin} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                    placeholder="tu@email.com"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                    placeholder="••••••••"
-                                    required
-                                />
-                            </div>
-
-                            {error && (
-                                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                                    {error}
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full bg-gradient-to-r from-amber-600 to-orange-600 text-white p-3 rounded-lg font-medium hover:from-amber-700 hover:to-orange-700 transition disabled:opacity-50"
-                            >
-                                {loading ? 'Ingresando...' : 'Ingresar'}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            );
-        }
+        const formatPeso = (amount) => `$${Math.round(amount || 0).toLocaleString('es-CO')}`;
 
         function App() {
             const [user, setUser] = useState(null);
-            const [loading, setLoading] = useState(true);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [clientes, setClientes] = useState([]);
             const [ventas, setVentas] = useState([]);
             const [ingresos, setIngresos] = useState([]);
             const [egresos, setEgresos] = useState([]);
-            const [searchTerm, setSearchTerm] = useState('');
+            const [filterDesde, setFilterDesde] = useState('');
+            const [filterHasta, setFilterHasta] = useState('');
 
-            const [clienteForm, setClienteForm] = useState({ 
-                nombre: '', 
-                email: '', 
-                telefono: '', 
-                direccion: '',
-                tipo_cliente: 'Individual',
-                dia_entrega: '',
-                precio_especial: '',
-                notas: ''
-            });
+            useEffect(()=>{init();},[]);
 
-            const [ventaForm, setVentaForm] = useState({ 
-                cliente_id: '', 
-                semana: '',
-                tipo_venta: 'Individual',
-                cantidad: '',
-                tipo_cantidad: 'Unidades',
-                precio_unitario: '',
-                precio_sugerido: '',
-                total: '',
-                estado_pago: 'Pendiente',
-                notas: '' 
-            });
-
-            const [ingresoForm, setIngresoForm] = useState({ concepto: '', monto: '', categoria: '' });
-            const [egresoForm, setEgresoForm] = useState({ concepto: '', monto: '', categoria: '' });
-
-            useEffect(() => {
-                checkUser();
-            }, []);
-
-            useEffect(() => {
-                if (user) {
-                    loadData();
-                }
-            }, [activeTab, user]);
-
-            // Calcular precio sugerido automáticamente
-            useEffect(() => {
-                if (ventaForm.cantidad && ventaForm.tipo_cantidad) {
-                    const cantidad = parseInt(ventaForm.cantidad);
-                    let precioUnit = 0;
-                    let sugerido = 0;
-
-                    if (ventaForm.tipo_cantidad === 'Unidades') {
-                        precioUnit = 600;
-                        sugerido = cantidad * 600;
-                    } else if (ventaForm.tipo_cantidad === 'Paquetes') {
-                        precioUnit = 6000;
-                        sugerido = cantidad * 6000;
-                    }
-
-                    setVentaForm(prev => ({
-                        ...prev,
-                        precio_unitario: precioUnit,
-                        precio_sugerido: sugerido,
-                        total: prev.total || sugerido
-                    }));
-                }
-            }, [ventaForm.cantidad, ventaForm.tipo_cantidad]);
-
-            const checkUser = async () => {
+            const init = async () => {
                 const { data: { session } } = await supabaseClient.auth.getSession();
-                setUser(session?.user || null);
-                setLoading(false);
+                if (!session) { setUser('anon'); return; }
+                setUser(session.user);
+                const { data: cl } = await supabaseClient.from('clientes').select('*');
+                const { data: vs } = await supabaseClient.from('ventas').select('*,clientes(nombre,tipo_cliente)').order('fecha',{ascending:false});
+                const { data: ing } = await supabaseClient.from('ingresos').select('*');
+                const { data: egr } = await supabaseClient.from('egresos').select('*');
+                setClientes(cl||[]);
+                setVentas(vs||[]);
+                setIngresos(ing||[]);
+                setEgresos(egr||[]);
             };
 
-            const handleLogin = (userData) => {
-                setUser(userData);
+            const updateTipoCliente = async (id, tipo) => {
+                await supabaseClient.from('clientes').update({tipo_cliente:tipo}).eq('id', id);
+                setClientes(clientes.map(c=>c.id===id?{...c,tipo_cliente:tipo}:c));
             };
 
-            const handleLogout = async () => {
-                await supabaseClient.auth.signOut();
-                setUser(null);
-            };
+            const updateEstadoPago = async (v, estado, abono) => {
+                const total = parseFloat(v.total)||0;
+                const abActual = parseFloat(v.abono)||0;
+                const abNuevo = abActual + (parseFloat(abono)||0);
+                const saldo = total - abNuevo;
+                let nuevoEstado = estado;
+                if(estado==='Abono' && saldo<=0) nuevoEstado='Pagado';
 
-            const loadData = async () => {
-                setLoading(true);
-                try {
-                    if (activeTab === 'clientes' || activeTab === 'dashboard') {
-                        const { data } = await supabaseClient.from('clientes').select('*').order('created_at', { ascending: false });
-                        setClientes(data || []);
-                    }
-                    if (activeTab === 'ventas' || activeTab === 'dashboard') {
-                        const { data } = await supabaseClient.from('ventas').select('*, clientes(nombre)').order('fecha', { ascending: false });
-                        setVentas(data || []);
-                    }
-                    if (activeTab === 'contabilidad' || activeTab === 'dashboard') {
-                        const { data: ing } = await supabaseClient.from('ingresos').select('*').order('fecha', { ascending: false });
-                        const { data: egr } = await supabaseClient.from('egresos').select('*').order('fecha', { ascending: false });
-                        setIngresos(ing || []);
-                        setEgresos(egr || []);
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
+                await supabaseClient.from('ventas').update({estado_pago:nuevoEstado, abono:abNuevo}).eq('id',v.id);
+                if(estado==='Abono' && abono>0){
+                    await supabaseClient.from('ingresos').insert([{concepto:`Abono - ${v.clientes?.nombre}`,monto:parseFloat(abono),categoria:'Abono',fecha:new Date().toISOString()}]);
                 }
-                setLoading(false);
-            };
-
-            const addCliente = async (e) => {
-                e.preventDefault();
-                const { error } = await supabaseClient.from('clientes').insert([clienteForm]);
-                if (!error) {
-                    setClienteForm({ 
-                        nombre: '', 
-                        email: '', 
-                        telefono: '', 
-                        direccion: '',
-                        tipo_cliente: 'Individual',
-                        dia_entrega: '',
-                        precio_especial: '',
-                        notas: ''
-                    });
-                    loadData();
-                } else {
-                    alert('Error: ' + error.message);
+                if(estado==='Pagado'){
+                    await supabaseClient.from('ingresos').insert([{concepto:`Venta - ${v.clientes?.nombre}`,monto:total,categoria:'Venta',fecha:new Date().toISOString()}]);
                 }
+                setVentas(ventas.map(x=>x.id===v.id?{...x,estado_pago:nuevoEstado,abono:abNuevo}:x));
             };
 
-            const deleteCliente = async (id) => {
-                if (confirm('¿Eliminar este cliente?')) {
-                    await supabaseClient.from('clientes').delete().eq('id', id);
-                    loadData();
-                }
-            };
+            const calcularResumen = () => {
+                const desde = filterDesde ? new Date(filterDesde) : new Date('2000-01-01');
+                const hasta = filterHasta ? new Date(filterHasta) : new Date();
 
-            const addVenta = async (e) => {
-                e.preventDefault();
-                
-                const total = parseFloat(ventaForm.total);
-                const precioUnitario = parseFloat(ventaForm.precio_unitario);
-
-                const { error } = await supabaseClient.from('ventas').insert([{
-                    cliente_id: parseInt(ventaForm.cliente_id),
-                    semana: ventaForm.semana,
-                    tipo_venta: ventaForm.tipo_venta,
-                    cantidad: parseInt(ventaForm.cantidad),
-                    tipo_cantidad: ventaForm.tipo_cantidad,
-                    precio_unitario: precioUnitario,
-                    total: total,
-                    estado_pago: ventaForm.estado_pago,
-                    notas: ventaForm.notas,
-                    usuario_id: user.id
-                }]);
-
-                if (!error) {
-                    setVentaForm({ 
-                        cliente_id: '', 
-                        semana: '',
-                        tipo_venta: 'Individual',
-                        cantidad: '',
-                        tipo_cantidad: 'Unidades',
-                        precio_unitario: '',
-                        precio_sugerido: '',
-                        total: '',
-                        estado_pago: 'Pendiente',
-                        notas: '' 
-                    });
-                    loadData();
-                    alert('¡Venta registrada!');
-                } else {
-                    alert('Error: ' + error.message);
-                }
-            };
-
-            const marcarPagado = async (ventaId, estadoActual) => {
-                const nuevoEstado = estadoActual === 'Pagado' ? 'Pendiente' : 'Pagado';
-                const { error } = await supabaseClient
-                    .from('ventas')
-                    .update({ 
-                        estado_pago: nuevoEstado,
-                        fecha_pago: nuevoEstado === 'Pagado' ? new Date().toISOString() : null
-                    })
-                    .eq('id', ventaId);
-
-                if (!error) {
-                    loadData();
-                }
-            };
-
-            const addIngreso = async (e) => {
-                e.preventDefault();
-                const { error } = await supabaseClient.from('ingresos').insert([{
-                    concepto: ingresoForm.concepto,
-                    monto: parseFloat(ingresoForm.monto),
-                    categoria: ingresoForm.categoria
-                }]);
-                if (!error) {
-                    setIngresoForm({ concepto: '', monto: '', categoria: '' });
-                    loadData();
-                }
-            };
-
-            const addEgreso = async (e) => {
-                e.preventDefault();
-                const { error } = await supabaseClient.from('egresos').insert([{
-                    concepto: egresoForm.concepto,
-                    monto: parseFloat(egresoForm.monto),
-                    categoria: egresoForm.categoria
-                }]);
-                if (!error) {
-                    setEgresoForm({ concepto: '', monto: '', categoria: '' });
-                    loadData();
-                }
-            };
-
-            const deleteIngreso = async (id) => {
-                if (confirm('¿Eliminar?')) {
-                    await supabaseClient.from('ingresos').delete().eq('id', id);
-                    loadData();
-                }
-            };
-
-            const deleteEgreso = async (id) => {
-                if (confirm('¿Eliminar?')) {
-                    await supabaseClient.from('egresos').delete().eq('id', id);
-                    loadData();
-                }
-            };
-
-            const calcularBalance = () => {
-                const totalIngresos = ingresos.reduce((sum, ing) => sum + parseFloat(ing.monto), 0);
-                const totalEgresos = egresos.reduce((sum, egr) => sum + parseFloat(egr.monto), 0);
-                const totalVentas = ventas.reduce((sum, v) => sum + parseFloat(v.total), 0);
-                const ventasPagadas = ventas.filter(v => v.estado_pago === 'Pagado').reduce((sum, v) => sum + parseFloat(v.total), 0);
-                const ventasPendientes = ventas.filter(v => v.estado_pago === 'Pendiente').reduce((sum, v) => sum + parseFloat(v.total), 0);
-                
-                return { 
-                    totalIngresos: totalIngresos + totalVentas, 
-                    totalEgresos, 
-                    balance: (totalIngresos + totalVentas) - totalEgresos,
-                    soloVentas: totalVentas,
-                    ventasPagadas,
-                    ventasPendientes
+                const filtrarFecha = (f) => {
+                    const fecha = new Date(f);
+                    return fecha >= desde && fecha <= hasta;
                 };
+
+                const ventasFiltradas = ventas.filter(v => v.fecha && filtrarFecha(v.fecha));
+                const ingresosFiltrados = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha));
+                const egresosFiltrados = egresos.filter(e => e.fecha && filtrarFecha(e.fecha));
+
+                const totalVentas = ventasFiltradas.reduce((s,v)=>s+(parseFloat(v.total)||0),0);
+                const totalAbonos = ventasFiltradas.reduce((s,v)=>s+(parseFloat(v.abono)||0),0);
+                const totalSaldo = totalVentas - totalAbonos;
+                const totalIngresos = ingresosFiltrados.reduce((s,i)=>s+(parseFloat(i.monto)||0),0);
+                const totalEgresos = egresosFiltrados.reduce((s,e)=>s+(parseFloat(e.monto)||0),0);
+
+                return {totalVentas,totalAbonos,totalSaldo,totalIngresos,totalEgresos};
             };
 
-            const balance = calcularBalance();
-
-            if (loading) {
-                return (
-                    <div className="min-h-screen bg-amber-50 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
-                            <p className="mt-4 text-gray-600">Cargando...</p>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (!user) {
-                return <LoginScreen onLogin={handleLogin} />;
-            }
+            const resumen = calcularResumen();
 
             return (
                 <div className="min-h-screen bg-amber-50">
-                    <div className="bg-gradient-to-r from-amber-700 via-orange-600 to-yellow-700 text-white p-6 shadow-lg">
-                        <div className="max-w-7xl mx-auto">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-white p-3 rounded-full shadow-lg">
-                                        <span className="text-4xl">🔥</span>
-                                    </div>
-                                    <div>
-                                        <h1 className="text-3xl font-bold flex items-center gap-2">
-                                            Arepas al Fuego
-                                            <span className="text-2xl">🌽</span>
-                                        </h1>
-                                        <p className="text-amber-100 mt-1">Sistema de Gestión - Eje Cafetero</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={handleLogout}
-                                    className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition"
-                                >
-                                    Cerrar Sesión
-                                </button>
-                            </div>
+                    <div className="bg-gradient-to-r from-amber-700 via-orange-600 to-yellow-700 text-white p-6">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <h1 className="text-2xl font-bold">Arepas al Fuego - Sistema</h1>
                         </div>
                     </div>
 
                     <div className="flex border-b bg-white shadow-sm sticky top-0 z-10 overflow-x-auto">
-                        {[
-                            { id: 'dashboard', label: 'Inicio', emoji: '📊' },
-                            { id: 'clientes', label: 'Clientes', emoji: '👥' },
-                            { id: 'ventas', label: 'Ventas', emoji: '🛒' },
-                            { id: 'contabilidad', label: 'Contabilidad', emoji: '💰' }
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => { setActiveTab(tab.id); setSearchTerm(''); }}
-                                className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors whitespace-nowrap ${
-                                    activeTab === tab.id
-                                        ? 'border-b-2 border-orange-600 text-orange-600 bg-orange-50'
-                                        : 'text-gray-600 hover:text-orange-600 hover:bg-amber-50'
-                                }`}
-                            >
-                                <span>{tab.emoji}</span>
-                                {tab.label}
-                            </button>
+                        {[{id:'dashboard',label:'Inicio'},{id:'clientes',label:'Clientes'},{id:'ventas',label:'Ventas'},{id:'contabilidad',label:'Contabilidad'},{id:'resumen',label:'Resumen'}].map(tab=>(
+                            <button key={tab.id} onClick={()=>setActiveTab(tab.id)} className={`px-6 py-4 ${activeTab===tab.id?'border-b-2 border-orange-600 text-orange-600':'text-gray-600'}`}>{tab.label}</button>
                         ))}
                     </div>
 
-                    <div className="max-w-7xl mx-auto p-4 md:p-6">
-                        {activeTab === 'dashboard' && (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition border-t-4 border-green-500">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-gray-500 text-sm">Clientes</p>
-                                                <p className="text-3xl font-bold text-gray-800 mt-1">{clientes.length}</p>
-                                            </div>
-                                            <span className="text-5xl">👥</span>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition border-t-4 border-orange-500">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-gray-500 text-sm">Ventas Totales</p>
-                                                <p className="text-3xl font-bold text-gray-800 mt-1">{ventas.length}</p>
-                                                <p className="text-sm text-orange-600 font-medium mt-1">{formatPeso(balance.soloVentas)}</p>
-                                            </div>
-                                            <span className="text-5xl">🔥</span>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition border-t-4 border-blue-500">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-gray-500 text-sm">Pagadas</p>
-                                                <p className="text-2xl font-bold text-green-600 mt-1">{formatPeso(balance.ventasPagadas)}</p>
-                                                <p className="text-xs text-gray-500 mt-1">Pendientes: {formatPeso(balance.ventasPendientes)}</p>
-                                            </div>
-                                            <span className="text-5xl">✅</span>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition border-t-4 border-yellow-500">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-gray-500 text-sm">Balance</p>
-                                                <p className={`text-3xl font-bold mt-1 ${balance.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {formatPeso(balance.balance)}
-                                                </p>
-                                            </div>
-                                            <span className="text-5xl">💰</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
-                                    <h3 className="text-lg font-bold mb-4 text-green-700">📈 Resumen Financiero</h3>
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between p-3 bg-green-50 rounded">
-                                            <span>Ingresos Totales</span>
-                                            <span className="font-bold text-green-600">{formatPeso(balance.totalIngresos)}</span>
-                                        </div>
-                                        <div className="flex justify-between p-3 bg-red-50 rounded">
-                                            <span>Egresos Totales</span>
-                                            <span className="font-bold text-red-600">{formatPeso(balance.totalEgresos)}</span>
-                                        </div>
-                                        <div className="flex justify-between p-3 bg-amber-50 rounded border-2 border-amber-400">
-                                            <span className="font-bold">Balance Neto</span>
-                                            <span className={`font-bold text-lg ${balance.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {formatPeso(balance.balance)}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                    <div className="max-w-7xl mx-auto p-4">
+                        {activeTab==='clientes' && (
+                            <div className="bg-white p-6 rounded shadow">
+                                <h2 className="font-bold">Clientes</h2>
+                                <table className="w-full mt-3">
+                                    <thead><tr><th>Nombre</th><th>Tipo</th><th>Cambiar</th></tr></thead>
+                                    <tbody>
+                                        {clientes.map(c=>(
+                                            <tr key={c.id} className="border-t"><td>{c.nombre}</td><td>{c.tipo_cliente}</td><td>
+                                                <select value={c.tipo_cliente} onChange={e=>updateTipoCliente(c.id,e.target.value)} className="p-1 border rounded">
+                                                    <option>Individual</option><option>Contrato</option>
+                                                </select>
+                                            </td></tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
 
-                        {activeTab === 'clientes' && (
-                            <div className="space-y-6">
-                                <div className="bg-white p-6 rounded-lg shadow">
-                                    <h2 className="text-xl font-bold mb-4">➕ Agregar Cliente</h2>
-                                    <form onSubmit={addCliente} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <input
-                                            type="text"
-                                            placeholder="Nombre"
-                                            value={clienteForm.nombre}
-                                            onChange={(e) => setClienteForm({...clienteForm, nombre: e.target.value})}
-                                            className="p-3 border rounded-lg"
-                                            required
-                                        />
-                                        <input
-                                            type="email"
-                                            placeholder="Email"
-                                            value={clienteForm.email}
-                                            onChange={(e) => setClienteForm({...clienteForm, email: e.target.value})}
-                                            className="p-3 border rounded-lg"
-                                        />
-                                        <input
-                                            type="tel"
-                                            placeholder="Teléfono"
-                                            value={clienteForm.telefono}
-                                            onChange={(e) => setClienteForm({...clienteForm, telefono: e.target.value})}
-                                            className="p-3 border rounded-lg"
-                                        />
-                                        <input
-                                            type="text"
-                                            placeholder="Dirección"
-                                            value={clienteForm.direccion}
-                                            onChange={(e) => setClienteForm({...clienteForm, direccion: e.target.value})}
-                                            className="p-3 border rounded-lg"
-                                        />
-                                        <select
-                                            value={clienteForm.tipo_cliente}
-                                            onChange={(e) => setClienteForm({...clienteForm, tipo_cliente: e.target.value})}
-                                            className="p-3 border rounded-lg"
-                                        >
-                                            <option value="Individual">Individual</option>
-                                            <option value="Contrato">Contrato</option>
-                                        </select>
-                                        <select
-                                            value={clienteForm.dia_entrega}
-                                            onChange={(e) => setClienteForm({...clienteForm, dia_entrega: e.target.value})}
-                                            className="p-3 border rounded-lg"
-                                        >
-                                            <option value="">Día de entrega</option>
-                                            <option value="Lunes">Lunes</option>
-                                            <option value="Martes">Martes</option>
-                                            <option value="Miércoles">Miércoles</option>
-                                            <option value="Jueves">Jueves</option>
-                                            <option value="Viernes">Viernes</option>
-                                            <option value="Sábado">Sábado</option>
-                                            <option value="Domingo">Domingo</option>
-                                        </select>
-                                        <input
-                                            type="number"
-                                            placeholder="Precio especial (opcional)"
-                                            value={clienteForm.precio_especial}
-                                            onChange={(e) => setClienteForm({...clienteForm, precio_especial: e.target.value})}
-                                            className="p-3 border rounded-lg"
-                                        />
-                                        <input
-                                            type="text"
-                                            placeholder="Notas"
-                                            value={clienteForm.notas}
-                                            onChange={(e) => setClienteForm({...clienteForm, notas: e.target.value})}
-                                            className="p-3 border rounded-lg md:col-span-2"
-                                        />
-                                        <button type="submit" className="md:col-span-3 bg-amber-600 text-white p-3 rounded-lg">
-                                            ✓ Agregar Cliente
-                                        </button>
-                                    </form>
+                        {activeTab==='resumen' && (
+                            <div className="bg-white p-6 rounded shadow space-y-4">
+                                <h2 className="font-bold text-xl">Resumen General</h2>
+                                <div className="flex gap-2">
+                                    <div>
+                                        <label>Desde:</label>
+                                        <input type="date" value={filterDesde} onChange={e=>setFilterDesde(e.target.value)} className="border p-2 rounded ml-1" />
+                                    </div>
+                                    <div>
+                                        <label>Hasta:</label>
+                                        <input type="date" value={filterHasta} onChange={e=>setFilterHasta(e.target.value)} className="border p-2 rounded ml-1" />
+                                    </div>
+                                    <button onClick={()=>{setFilterDesde('');setFilterHasta('');}} className="px-3 py-1 border rounded">Limpiar</button>
                                 </div>
 
-                                <div className="bg-white p-6 rounded-lg shadow">
-                                    <h2 className="text-xl font-bold mb-4">Lista de Clientes ({clientes.length})</h2>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                            <thead className="bg-gray-50">
-                                                <tr>
-                                                    <th className="p-3 text-left">Nombre</th>
-                                                    <th className="p-3 text-left">Tipo</th>
-                                                    <th className="p-3 text-left">Teléfono</th>
-                                                    <th className="p-3 text-left">Día</th>
-                                                    <th className="p-3 text-left">Acción</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {clientes.map((c) => (
-                                                    <tr key={c.id} className="border-b">
-                                                        <td className="p-3 font-medium">{c.nombre}</td>
-                                                        <td className="p-3">
-                                                            <span className={`px-2 py-1 rounded text-xs ${c.tipo_cliente === 'Contrato' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
-                                                                {c.tipo_cliente}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-3">{c.telefono || '-'}</td>
-                                                        <td className="p-3">{c.dia_entrega || '-'}</td>
-                                                        <td className="p-3">
-                                                            <button onClick={() => deleteCliente(c.id)} className="text-red-600">
-                                                                🗑️
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                    <div className="bg-amber-50 p-4 rounded shadow">
+                                        <p className="font-bold">Total Ventas</p>
+                                        <p>{formatPeso(resumen.totalVentas)}</p>
                                     </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'ventas' && (
-                            <div className="space-y-6">
-                                <div className="bg-white p-6 rounded-lg shadow">
-                                    <h2 className="text-xl font-bold mb-4">🛒 Registrar Venta</h2>
-                                    <form onSubmit={addVenta} className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <select
-                                                value={ventaForm.cliente_id}
-                                                onChange={(e) => setVentaForm({...ventaForm, cliente_id: e.target.value})}
-                                                className="p-3 border rounded-lg"
-                                                required
-                                            >
-                                                <option value="">Seleccionar Cliente</option>
-                                                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                                            </select>
-                                            <input
-                                                type="text"
-                                                placeholder="Semana (ej: Semana 41 - Oct 2025)"
-                                                value={ventaForm.semana}
-                                                onChange={(e) => setVentaForm({...ventaForm, semana: e.target.value})}
-                                                className="p-3 border rounded-lg"
-                                            />
-                                            <select
-                                                value={ventaForm.tipo_venta}
-                                                onChange={(e) => setVentaForm({...ventaForm, tipo_venta: e.target.value})}
-                                                className="p-3 border rounded-lg"
-                                            >
-                                                <option value="Individual">Individual</option>
-                                                <option value="Contrato">Contrato</option>
-                                            </select>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <select
-                                                value={ventaForm.tipo_cantidad}
-                                                onChange={(e) => setVentaForm({...ventaForm, tipo_cantidad: e.target.value, cantidad: '', total: ''})}
-                                                className="p-3 border rounded-lg"
-                                            >
-                                                <option value="Unidades">Unidades ($600 c/u)</option>
-                                                <option value="Paquetes">Paquetes ($6,000 c/u)</option>
-                                            </select>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                placeholder="Cantidad"
-                                                value={ventaForm.cantidad}
-                                                onChange={(e) => setVentaForm({...ventaForm, cantidad: e.target.value})}
-                                                className="p-3 border rounded-lg"
-                                                required
-                                            />
-                                        </div>
-
-                                        {ventaForm.precio_sugerido > 0 && (
-                                            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                                                <p className="text-sm text-blue-700 mb-2">💡 Precio sugerido: <strong>{formatPeso(ventaForm.precio_sugerido)}</strong></p>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setVentaForm({...ventaForm, total: ventaForm.precio_sugerido})}
-                                                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
-                                                    >
-                                                        Usar precio sugerido
-                                                    </button>
-                                                    <input
-                                                        type="number"
-                                                        placeholder="O ingresa precio personalizado"
-                                                        value={ventaForm.total}
-                                                        onChange={(e) => setVentaForm({...ventaForm, total: e.target.value})}
-                                                        className="flex-1 p-2 border rounded-lg"
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <select
-                                                value={ventaForm.estado_pago}
-                                                onChange={(e) => setVentaForm({...ventaForm, estado_pago: e.target.value})}
-                                                className="p-3 border rounded-lg"
-                                            >
-                                                <option value="Pendiente">Pendiente</option>
-                                                <option value="Pagado">Pagado</option>
-                                            </select>
-                                            <input
-                                                type="text"
-                                                placeholder="Notas (opcional)"
-                                                value={ventaForm.notas}
-                                                onChange={(e) => setVentaForm({...ventaForm, notas: e.target.value})}
-                                                className="p-3 border rounded-lg"
-                                            />
-                                        </div>
-
-                                        <button type="submit" className="w-full bg-orange-600 text-white p-3 rounded-lg font-medium hover:bg-orange-700">
-                                            ✓ Registrar Venta
-                                        </button>
-                                    </form>
-                                </div>
-
-                                <div className="bg-white p-6 rounded-lg shadow">
-                                    <h2 className="text-xl font-bold mb-4">Historial de Ventas ({ventas.length})</h2>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                            <thead className="bg-gray-50">
-                                                <tr>
-                                                    <th className="p-3 text-left">Cliente</th>
-                                                    <th className="p-3 text-left">Semana</th>
-                                                    <th className="p-3 text-left">Cantidad</th>
-                                                    <th className="p-3 text-left">Total</th>
-                                                    <th className="p-3 text-left">Estado</th>
-                                                    <th className="p-3 text-left">Fecha</th>
-                                                    <th className="p-3 text-left">Acción</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {ventas.map((v) => (
-                                                    <tr key={v.id} className="border-b">
-                                                        <td className="p-3 font-medium">{v.clientes?.nombre || 'N/A'}</td>
-                                                        <td className="p-3 text-sm">{v.semana || '-'}</td>
-                                                        <td className="p-3">
-                                                            <span className="text-sm bg-gray-100 px-2 py-1 rounded">
-                                                                {v.cantidad} {v.tipo_cantidad}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-3 text-green-600 font-bold">{formatPeso(v.total)}</td>
-                                                        <td className="p-3">
-                                                            <button
-                                                                onClick={() => marcarPagado(v.id, v.estado_pago)}
-                                                                className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                                    v.estado_pago === 'Pagado' 
-                                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                                                                        : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                                                                }`}
-                                                            >
-                                                                {v.estado_pago === 'Pagado' ? '✅ Pagado' : '⏳ Pendiente'}
-                                                            </button>
-                                                        </td>
-                                                        <td className="p-3 text-sm text-gray-600">
-                                                            {new Date(v.fecha).toLocaleDateString('es-CO')}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            {v.notas && (
-                                                                <span title={v.notas} className="cursor-help">📝</span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                    <div className="bg-green-50 p-4 rounded shadow">
+                                        <p className="font-bold">Total Abonos</p>
+                                        <p>{formatPeso(resumen.totalAbonos)}</p>
                                     </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'contabilidad' && (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
-                                        <h2 className="text-xl font-bold mb-4 text-green-600">📈 Ingreso</h2>
-                                        <form onSubmit={addIngreso} className="space-y-4">
-                                            <input
-                                                type="text"
-                                                placeholder="Concepto"
-                                                value={ingresoForm.concepto}
-                                                onChange={(e) => setIngresoForm({...ingresoForm, concepto: e.target.value})}
-                                                className="w-full p-3 border rounded-lg"
-                                                required
-                                            />
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                placeholder="Monto"
-                                                value={ingresoForm.monto}
-                                                onChange={(e) => setIngresoForm({...ingresoForm, monto: e.target.value})}
-                                                className="w-full p-3 border rounded-lg"
-                                                required
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="Categoría"
-                                                value={ingresoForm.categoria}
-                                                onChange={(e) => setIngresoForm({...ingresoForm, categoria: e.target.value})}
-                                                className="w-full p-3 border rounded-lg"
-                                            />
-                                            <button type="submit" className="w-full bg-green-600 text-white p-3 rounded-lg">
-                                                ✓ Agregar Ingreso
-                                            </button>
-                                        </form>
+                                    <div className="bg-yellow-50 p-4 rounded shadow">
+                                        <p className="font-bold">Saldo Pendiente</p>
+                                        <p>{formatPeso(resumen.totalSaldo)}</p>
                                     </div>
-
-                                    <div className="bg-white p-6 rounded-lg shadow border-l-4 border-red-500">
-                                        <h2 className="text-xl font-bold mb-4 text-red-600">📉 Egreso</h2>
-                                        <form onSubmit={addEgreso} className="space-y-4">
-                                            <input
-                                                type="text"
-                                                placeholder="Concepto"
-                                                value={egresoForm.concepto}
-                                                onChange={(e) => setEgresoForm({...egresoForm, concepto: e.target.value})}
-                                                className="w-full p-3 border rounded-lg"
-                                                required
-                                            />
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                placeholder="Monto"
-                                                value={egresoForm.monto}
-                                                onChange={(e) => setEgresoForm({...egresoForm, monto: e.target.value})}
-                                                className="w-full p-3 border rounded-lg"
-                                                required
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="Categoría"
-                                                value={egresoForm.categoria}
-                                                onChange={(e) => setEgresoForm({...egresoForm, categoria: e.target.value})}
-                                                className="w-full p-3 border rounded-lg"
-                                            />
-                                            <button type="submit" className="w-full bg-red-600 text-white p-3 rounded-lg">
-                                                ✓ Agregar Egreso
-                                            </button>
-                                        </form>
+                                    <div className="bg-blue-50 p-4 rounded shadow">
+                                        <p className="font-bold">Ingresos</p>
+                                        <p>{formatPeso(resumen.totalIngresos)}</p>
                                     </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="bg-white p-6 rounded-lg shadow">
-                                        <h2 className="text-xl font-bold mb-4 text-green-600">Ingresos ({ingresos.length})</h2>
-                                        <div className="space-y-2 max-h-96 overflow-y-auto">
-                                            {ingresos.map((ing) => (
-                                                <div key={ing.id} className="flex justify-between items-center p-3 bg-green-50 rounded">
-                                                    <div>
-                                                        <p className="font-medium">{ing.concepto}</p>
-                                                        <p className="text-sm text-gray-500">{new Date(ing.fecha).toLocaleDateString('es-CO')}</p>
-                                                    </div>
-                                                    <div className="flex gap-3 items-center">
-                                                        <span className="text-green-600 font-bold">{formatPeso(ing.monto)}</span>
-                                                        <button onClick={() => deleteIngreso(ing.id)} className="text-red-600">🗑️</button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {ingresos.length === 0 && <p className="text-center py-4 text-gray-500">Sin registros</p>}
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white p-6 rounded-lg shadow">
-                                        <h2 className="text-xl font-bold mb-4 text-red-600">Egresos ({egresos.length})</h2>
-                                        <div className="space-y-2 max-h-96 overflow-y-auto">
-                                            {egresos.map((egr) => (
-                                                <div key={egr.id} className="flex justify-between items-center p-3 bg-red-50 rounded">
-                                                    <div>
-                                                        <p className="font-medium">{egr.concepto}</p>
-                                                        <p className="text-sm text-gray-500">{new Date(egr.fecha).toLocaleDateString('es-CO')}</p>
-                                                    </div>
-                                                    <div className="flex gap-3 items-center">
-                                                        <span className="text-red-600 font-bold">{formatPeso(egr.monto)}</span>
-                                                        <button onClick={() => deleteEgreso(egr.id)} className="text-red-600">🗑️</button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {egresos.length === 0 && <p className="text-center py-4 text-gray-500">Sin registros</p>}
-                                        </div>
+                                    <div className="bg-red-50 p-4 rounded shadow">
+                                        <p className="font-bold">Egresos</p>
+                                        <p>{formatPeso(resumen.totalEgresos)}</p>
                                     </div>
                                 </div>
                             </div>
