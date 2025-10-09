@@ -1,1 +1,971 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arepas al Fuego - Sistema de Gestión</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <style>
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        .pulse-hover:hover { animation: pulse 0.6s ease-in-out; }
+        .gradient-text { background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { createClient } = supabase;
+        
+        const SUPABASE_URL = 'https://xybyupmrtiyspxlzcaug.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Ynl1cG1ydGl5c3B4bHpjYXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODk3MDYsImV4cCI6MjA3NTQ2NTcwNn0.EHS9tI0-2vllcfdU-W4zeCVWf7csG24CtVmUbmk7s1M';
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const formatCOP = (amount) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+
+        // Toast Component
+        function Toast({toasts, remove}){
+            return (
+                <div className="fixed bottom-6 right-6 space-y-2 z-50">
+                    {toasts.map(t=> (
+                        <div key={t.id} className={`fade-in px-4 py-3 rounded-lg shadow-xl flex items-center gap-3 ${t.type==='success'?'bg-gradient-to-r from-green-500 to-green-600 text-white':t.type==='error'?'bg-gradient-to-r from-red-500 to-red-600 text-white':'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black'}`}>
+                            <span className="text-xl">{t.icon}</span>
+                            <div className="font-medium">{t.message}</div>
+                            <button onClick={()=>remove(t.id)} className="ml-2 opacity-80 hover:opacity-100 text-xl">×</button>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        // Login Component
+        function LoginPage({ onLogin }) {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError('');
+
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) {
+                    setError('Credenciales incorrectas');
+                    setLoading(false);
+                } else {
+                    onLogin(data.user);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-amber-100 via-orange-50 to-yellow-100 flex items-center justify-center p-4">
+                    <div className="fade-in bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md border-t-8 border-orange-600">
+                        <div className="text-center mb-8">
+                            <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-5 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center shadow-lg pulse-hover">
+                                <span className="text-6xl">🔥</span>
+                            </div>
+                            <h1 className="text-4xl font-bold gradient-text mb-3">Arepas al Fuego</h1>
+                            <p className="text-gray-600 text-lg">Sistema de Gestión</p>
+                        </div>
+
+                        <form onSubmit={handleLogin} className="space-y-5">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">📧 Correo electrónico</label>
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition" placeholder="tu@email.com" required />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">🔒 Contraseña</label>
+                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition" placeholder="••••••••" required />
+                            </div>
+
+                            {error && (
+                                <div className="fade-in bg-red-50 border-2 border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+                                    <span>⚠️</span> {error}
+                                </div>
+                            )}
+
+                            <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-amber-600 to-orange-600 text-white p-4 rounded-xl font-bold text-lg hover:from-amber-700 hover:to-orange-700 transition disabled:opacity-50 shadow-lg pulse-hover">
+                                {loading ? '🔄 Iniciando sesión...' : '🚀 Iniciar Sesión'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        function App(){
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [clientes, setClientes] = useState([]);
+            const [ventas, setVentas] = useState([]);
+            const [ingresos, setIngresos] = useState([]);
+            const [egresos, setEgresos] = useState([]);
+            const [toasts, setToasts] = useState([]);
+
+            // Forms
+            const [clienteForm, setClienteForm] = useState({nombre:'',direccion:'',tipo_cliente:'Individual',dia_entrega:'',precio_especial:'',notas:''});
+            const [ventaForm, setVentaForm] = useState({cliente_id:'',semana:'',tipo_venta:'Individual',cantidad:'',tipo_cantidad:'Unidades',precio_unitario:'',precio_sugerido:'',total:'',estado_pago:'Pendiente',fecha:'',payment_type:'Total',abono:'',notas:''});
+            const [ingresoForm, setIngresoForm] = useState({concepto:'',monto:'',categoria:'',fecha:''});
+            const [egresoForm, setEgresoForm] = useState({concepto:'',monto:'',categoria:'',fecha:''});
+            const [filterDate, setFilterDate] = useState('');
+            const [filterEstado, setFilterEstado] = useState('Todos');
+            const [resDesde, setResDesde] = useState('');
+            const [resHasta, setResHasta] = useState('');
+
+            const pushToast = (msg, type='success')=>{ const id = Date.now()+Math.random(); const icon = type==='success'?'✅':type==='error'?'❌':'⚠️'; setToasts(t=>[...t,{id,message:msg,type,icon}]); setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),5000); };
+            const removeToast = (id)=> setToasts(t=>t.filter(x=>x.id!==id));
+
+            useEffect(()=>{ checkUserAndLoad(); }, []);
+
+            const checkUserAndLoad = async ()=>{
+                setLoading(true);
+                const { data:{ session } } = await supabaseClient.auth.getSession();
+                setUser(session?.user || null);
+                if(session?.user) await loadData();
+                setLoading(false);
+            };
+
+            const loadData = async ()=>{
+                try{
+                    const { data: cl } = await supabaseClient.from('clientes').select('*').order('created_at',{ascending:false});
+                    const { data: vs } = await supabaseClient.from('ventas').select('*, clientes(nombre)').order('fecha',{ascending:false});
+                    const { data: ing } = await supabaseClient.from('ingresos').select('*').order('fecha',{ascending:false});
+                    const { data: egr } = await supabaseClient.from('egresos').select('*').order('fecha',{ascending:false});
+                    setClientes(cl||[]);
+                    setVentas(vs||[]);
+                    setIngresos(ing||[]);
+                    setEgresos(egr||[]);
+                }catch(err){ console.error(err); pushToast('Error cargando datos','error'); }
+            };
+
+            const handleLogout = async () => { await supabaseClient.auth.signOut(); setUser(null); pushToast('Sesión cerrada'); };
+
+            // CLIENTES - CORREGIDO
+            const addCliente = async (e)=>{ 
+                e.preventDefault(); 
+                
+                const payload = {
+                    nombre: clienteForm.nombre,
+                    direccion: clienteForm.direccion || null,
+                    tipo_cliente: clienteForm.tipo_cliente,
+                    dia_entrega: clienteForm.dia_entrega || null,
+                    precio_especial: clienteForm.precio_especial ? parseFloat(clienteForm.precio_especial) : null,
+                    notas: clienteForm.notas || null,
+                    activo: true
+                };
+                
+                const { data, error } = await supabaseClient
+                    .from('clientes')
+                    .insert(payload)
+                    .select();
+                
+                if(error) { 
+                    console.error('ERROR CLIENTE:', error);
+                    pushToast('Error: ' + error.message,'error'); 
+                } else { 
+                    pushToast('✅ Cliente agregado'); 
+                    setClienteForm({nombre:'',direccion:'',tipo_cliente:'Individual',dia_entrega:'',precio_especial:'',notas:''}); 
+                    loadData(); 
+                } 
+            };
+
+            const updateTipoCliente = async (id, tipo) => { 
+                const { error } = await supabaseClient.from('clientes').update({tipo_cliente:tipo}).eq('id', id);
+                if(error) {
+                    console.error('ERROR UPDATE:', error);
+                    pushToast('Error al actualizar','error');
+                } else {
+                    setClientes(cs=>cs.map(c=>c.id===id?{...c,tipo_cliente:tipo}:c)); 
+                    pushToast('Tipo actualizado');
+                }
+            };
+
+            const deleteCliente = async (id)=>{ 
+                if(!confirm('¿Eliminar cliente?')) return; 
+                const { error } = await supabaseClient.from('clientes').update({activo:false}).eq('id',id); 
+                if(error) {
+                    console.error('ERROR DELETE:', error);
+                    pushToast('Error al eliminar','error');
+                } else {
+                    pushToast('Cliente eliminado','error'); 
+                    loadData();
+                }
+            };
+
+            // VENTAS - CORREGIDO
+            useEffect(()=>{
+                if(ventaForm.cantidad && ventaForm.tipo_cantidad){
+                    const cantidad = parseInt(ventaForm.cantidad)||0;
+                    const sugerido = ventaForm.tipo_cantidad==='Unidades' ? cantidad * 600 : cantidad * 6000;
+                    setVentaForm(v=>({...v,precio_unitario:ventaForm.tipo_cantidad==='Unidades'?600:6000,precio_sugerido:sugerido}));
+                }
+            },[ventaForm.cantidad, ventaForm.tipo_cantidad]);
+
+            const addVenta = async (e)=>{ 
+                e.preventDefault(); 
+                
+                const total = parseFloat(ventaForm.total)||0; 
+                const abono = parseFloat(ventaForm.abono)||0; 
+                const fechaISO = ventaForm.fecha ? new Date(ventaForm.fecha).toISOString() : new Date().toISOString(); 
+                
+                const payload = { 
+                    cliente_id: parseInt(ventaForm.cliente_id), 
+                    semana: ventaForm.semana || null, 
+                    tipo_venta: ventaForm.tipo_venta, 
+                    cantidad: parseInt(ventaForm.cantidad)||0, 
+                    tipo_cantidad: ventaForm.tipo_cantidad, 
+                    precio_unitario: parseFloat(ventaForm.precio_unitario)||0, 
+                    total: total, 
+                    estado_pago: ventaForm.estado_pago, 
+                    fecha: fechaISO, 
+                    payment_type: ventaForm.payment_type, 
+                    abono: abono, 
+                    notas: ventaForm.notas || null, 
+                    usuario_id: user?.id 
+                }; 
+                
+                const { data, error } = await supabaseClient
+                    .from('ventas')
+                    .insert(payload)
+                    .select();
+                
+                if(error){ 
+                    console.error('ERROR VENTA:', error);
+                    pushToast('Error: ' + error.message,'error'); 
+                    return; 
+                } 
+                
+                if(ventaForm.estado_pago==='Pagado'){ 
+                    await supabaseClient.from('ingresos').insert({
+                        concepto:`Venta - ${clienteDisplay(ventaForm.cliente_id)}`,
+                        monto:total,
+                        categoria:'Venta',
+                        fecha:fechaISO
+                    }).select(); 
+                } else if(abono>0){ 
+                    await supabaseClient.from('ingresos').insert({
+                        concepto:`Abono - ${clienteDisplay(ventaForm.cliente_id)}`,
+                        monto:abono,
+                        categoria:'Abono',
+                        fecha:fechaISO
+                    }).select(); 
+                } 
+                
+                pushToast('✅ Venta registrada'); 
+                setVentaForm({cliente_id:'',semana:'',tipo_venta:'Individual',cantidad:'',tipo_cantidad:'Unidades',precio_unitario:'',precio_sugerido:'',total:'',estado_pago:'Pendiente',fecha:'',payment_type:'Total',abono:'',notas:''}); 
+                loadData(); 
+            };
+
+            const deleteVenta = async (id)=>{ 
+                if(!confirm('¿Eliminar venta?')) return; 
+                const { error } = await supabaseClient.from('ventas').delete().eq('id',id); 
+                if(error) {
+                    console.error('ERROR DELETE VENTA:', error);
+                    pushToast('Error al eliminar','error');
+                } else {
+                    pushToast('Venta eliminada','error'); 
+                    loadData();
+                }
+            };
+
+            const setPagoVenta = async (v, action, abonoMonto=0)=>{ 
+                const total = parseFloat(v.total)||0; 
+                const actualAbono = parseFloat(v.abono)||0; 
+                
+                if(action==='Pagado'){ 
+                    const { error } = await supabaseClient.from('ventas').update({estado_pago:'Pagado',abono:total}).eq('id',v.id); 
+                    if(error) { 
+                        console.error('Error al actualizar:', error);
+                        pushToast('Error: ' + error.message,'error'); 
+                        return;
+                    }
+                    await supabaseClient.from('ingresos').insert({
+                        concepto:`Venta - ${v.clientes?.nombre}`,
+                        monto:total-actualAbono,
+                        categoria:'Venta',
+                        fecha:new Date().toISOString()
+                    }).select(); 
+                    pushToast('✅ Marcado como pagado'); 
+                } else if(action==='Abono'){ 
+                    const nuevoAbono = actualAbono + (parseFloat(abonoMonto)||0); 
+                    const nuevoEstado = (total - nuevoAbono) <= 0 ? 'Pagado' : 'Pendiente'; 
+                    const { error } = await supabaseClient.from('ventas').update({abono:nuevoAbono,estado_pago:nuevoEstado}).eq('id',v.id); 
+                    if(error) { 
+                        console.error('Error al actualizar abono:', error);
+                        pushToast('Error: ' + error.message,'error'); 
+                        return;
+                    }
+                    await supabaseClient.from('ingresos').insert({
+                        concepto:`Abono - ${v.clientes?.nombre}`,
+                        monto:parseFloat(abonoMonto)||0,
+                        categoria:'Abono',
+                        fecha:new Date().toISOString()
+                    }).select(); 
+                    pushToast('💰 Abono registrado'); 
+                } else { 
+                    const { error } = await supabaseClient.from('ventas').update({estado_pago:'Pendiente',abono:0}).eq('id',v.id); 
+                    if(error) { 
+                        console.error('Error:', error);
+                        pushToast('Error: ' + error.message,'error'); 
+                        return;
+                    }
+                    pushToast('⏳ Marcado pendiente'); 
+                } 
+                await loadData(); 
+            };
+
+            const updateFechaVenta = async (id, fecha) => { 
+                const fechaISO = fecha ? new Date(fecha).toISOString() : null; 
+                const { error } = await supabaseClient.from('ventas').update({ fecha: fechaISO }).eq('id', id); 
+                if(error) {
+                    console.error('ERROR UPDATE FECHA:', error);
+                    pushToast('Error al actualizar','error');
+                } else {
+                    pushToast('Fecha actualizada'); 
+                    loadData();
+                }
+            };
+
+            // INGRESOS/EGRESOS - CORREGIDO
+            const addIngreso = async (e)=>{ 
+                e.preventDefault(); 
+                const fechaISO = ingresoForm.fecha ? new Date(ingresoForm.fecha).toISOString() : new Date().toISOString(); 
+                
+                const payload = { 
+                    concepto: ingresoForm.concepto, 
+                    monto: parseFloat(ingresoForm.monto)||0, 
+                    categoria: ingresoForm.categoria || null, 
+                    fecha: fechaISO 
+                };
+                
+                const { error } = await supabaseClient
+                    .from('ingresos')
+                    .insert(payload)
+                    .select(); 
+                
+                if(error){ 
+                    console.error('ERROR INGRESO:', error);
+                    pushToast('Error: ' + error.message,'error'); 
+                } else { 
+                    pushToast('✅ Ingreso agregado'); 
+                    setIngresoForm({concepto:'',monto:'',categoria:'',fecha:''}); 
+                    loadData(); 
+                } 
+            };
+
+            const addEgreso = async (e)=>{ 
+                e.preventDefault(); 
+                const fechaISO = egresoForm.fecha ? new Date(egresoForm.fecha).toISOString() : new Date().toISOString(); 
+                
+                const payload = { 
+                    concepto: egresoForm.concepto, 
+                    monto: parseFloat(egresoForm.monto)||0, 
+                    categoria: egresoForm.categoria || null, 
+                    fecha: fechaISO 
+                };
+                
+                const { error } = await supabaseClient
+                    .from('egresos')
+                    .insert(payload)
+                    .select(); 
+                
+                if(error){ 
+                    console.error('ERROR EGRESO:', error);
+                    pushToast('Error: ' + error.message,'error'); 
+                } else { 
+                    pushToast('✅ Egreso agregado'); 
+                    setEgresoForm({concepto:'',monto:'',categoria:'',fecha:''}); 
+                    loadData(); 
+                } 
+            };
+
+            const deleteIngreso = async (id)=>{ 
+                if(!confirm('¿Eliminar?')) return; 
+                const { error } = await supabaseClient.from('ingresos').delete().eq('id',id); 
+                if(error) {
+                    console.error('ERROR DELETE INGRESO:', error);
+                    pushToast('Error','error');
+                } else {
+                    pushToast('Eliminado','error'); 
+                    loadData();
+                }
+            };
+
+            const deleteEgreso = async (id)=>{ 
+                if(!confirm('¿Eliminar?')) return; 
+                const { error } = await supabaseClient.from('egresos').delete().eq('id',id); 
+                if(error) {
+                    console.error('ERROR DELETE EGRESO:', error);
+                    pushToast('Error','error');
+                } else {
+                    pushToast('Eliminado','error'); 
+                    loadData();
+                }
+            };
+
+            const clienteDisplay = (id)=>{ const c = clientes.find(x=>x.id===parseInt(id)); return c?.nombre||'Cliente'; };
+
+            const ventasFiltradas = ventas.filter(v=>{ if(filterDate){ if(!v.fecha) return false; if(v.fecha.slice(0,10)!==filterDate) return false; } if(filterEstado==='Pagadas') return v.estado_pago==='Pagado'; if(filterEstado==='Pendientes') return v.estado_pago==='Pendiente'; return true; });
+
+            const calcularResumen = () => {
+                const desde = resDesde ? new Date(resDesde) : new Date('2000-01-01');
+                const hasta = resHasta ? new Date(resHasta) : new Date();
+                const filtrarFecha = (f) => { const fecha = new Date(f); return fecha >= desde && fecha <= hasta; };
+                const ventasFil = ventas.filter(v=>v.fecha && filtrarFecha(v.fecha));
+                const ingFil = ingresos.filter(i=>i.fecha && filtrarFecha(i.fecha));
+                const egrFil = egresos.filter(e=>e.fecha && filtrarFecha(e.fecha));
+                const totalVentas = ventasFil.reduce((s,v)=>(s + (parseFloat(v.total)||0)),0);
+                const totalAbonos = ventasFil.reduce((s,v)=>(s + (parseFloat(v.abono)||0)),0);
+                const totalSaldo = totalVentas - totalAbonos;
+                const totalIngresos = ingFil.reduce((s,i)=>(s + (parseFloat(i.monto)||0)),0);
+                const totalEgresos = egrFil.reduce((s,e)=>(s + (parseFloat(e.monto)||0)),0);
+                return { totalVentas, totalAbonos, totalSaldo, totalIngresos, totalEgresos };
+            };
+
+            const resumen = calcularResumen();
+            const totalIngresosGlobal = ingresos.reduce((s,i)=>s+(parseFloat(i.monto)||0),0);
+            const totalEgresosGlobal = egresos.reduce((s,e)=>s+(parseFloat(e.monto)||0),0);
+            const balanceGlobal = totalIngresosGlobal - totalEgresosGlobal;
+            const ventasPendientes = ventas.filter(v=>v.estado_pago==='Pendiente').reduce((s,v)=>s+(parseFloat(v.total)||0)-(parseFloat(v.abono)||0),0);
+
+            if(loading) return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-100 to-orange-100"><div className="text-center"><div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-orange-600"></div><p className="mt-4 text-xl font-semibold text-gray-700">Cargando...</p></div></div>;
+            if(!user) return <LoginPage onLogin={setUser} />;
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+                    <div className="bg-gradient-to-r from-amber-700 via-orange-600 to-yellow-600 text-white p-4 shadow-2xl sticky top-0 z-20">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-white/20 backdrop-blur-sm p-3 rounded-full shadow-lg pulse-hover">
+                                    <span className="text-4xl">🔥</span>
+                                </div>
+                                <div>
+                                    <h1 className="text-2xl md:text-3xl font-bold">Arepas al Fuego 🌽</h1>
+                                    <p className="text-amber-100 text-sm">{user?.email}</p>
+                                </div>
+                            </div>
+                            <button onClick={handleLogout} className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm">
+                                🚪 Salir
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex border-b bg-white shadow-lg sticky top-16 z-10 overflow-x-auto">
+                        {[ { id: 'dashboard', label: 'Inicio', icon: '📊' }, { id: 'clientes', label: 'Clientes', icon: '👥' }, { id: 'ventas', label: 'Ventas', icon: '🛒' }, { id: 'contabilidad', label: 'Contabilidad', icon: '💰' }, { id: 'resumen', label: 'Resumen', icon: '📈' } ].map(tab => (
+                            <button key={tab.id} onClick={()=>{ setActiveTab(tab.id); setFilterDate(''); setFilterEstado('Todos'); }} className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all whitespace-nowrap ${activeTab===tab.id ? 'border-b-4 border-orange-600 text-orange-600 bg-orange-50' : 'text-gray-600 hover:text-orange-600 hover:bg-amber-50'}`}>
+                                <span className="text-xl">{tab.icon}</span>
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="max-w-7xl mx-auto p-4 md:p-6">
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-6 fade-in">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition pulse-hover">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <p className="text-blue-100 text-sm font-medium">Clientes Activos</p>
+                                                <p className="text-4xl font-bold mt-2">{clientes.filter(c=>c.activo!==false).length}</p>
+                                            </div>
+                                            <span className="text-5xl opacity-80">👥</span>
+                                        </div>
+                                        <div className="text-xs text-blue-100">{clientes.filter(c=>c.tipo_cliente==='Contrato').length} contratos</div>
+                                    </div>
+
+                                    <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition pulse-hover">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <p className="text-green-100 text-sm font-medium">Ingresos</p>
+                                                <p className="text-2xl font-bold mt-2">{formatCOP(totalIngresosGlobal)}</p>
+                                            </div>
+                                            <span className="text-5xl opacity-80">💵</span>
+                                        </div>
+                                        <div className="text-xs text-green-100">{ingresos.length} registros</div>
+                                    </div>
+
+                                    <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition pulse-hover">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <p className="text-red-100 text-sm font-medium">Egresos</p>
+                                                <p className="text-2xl font-bold mt-2">{formatCOP(totalEgresosGlobal)}</p>
+                                            </div>
+                                            <span className="text-5xl opacity-80">💸</span>
+                                        </div>
+                                        <div className="text-xs text-red-100">{egresos.length} registros</div>
+                                    </div>
+
+                                    <div className="bg-gradient-to-br from-amber-500 to-orange-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition pulse-hover">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <p className="text-amber-100 text-sm font-medium">Balance</p>
+                                                <p className="text-2xl font-bold mt-2">{formatCOP(balanceGlobal)}</p>
+                                            </div>
+                                            <span className="text-5xl opacity-80">💰</span>
+                                        </div>
+                                        <div className="text-xs text-amber-100">Total neto</div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="bg-white p-6 rounded-2xl shadow-xl border-l-8 border-orange-500">
+                                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><span>📊</span> Resumen de Ventas</h3>
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between p-4 bg-orange-50 rounded-xl">
+                                                <span className="font-medium">Total Ventas</span>
+                                                <span className="font-bold text-orange-600">{formatCOP(ventas.reduce((s,v)=>s+(parseFloat(v.total)||0),0))}</span>
+                                            </div>
+                                            <div className="flex justify-between p-4 bg-green-50 rounded-xl">
+                                                <span className="font-medium">Pagadas</span>
+                                                <span className="font-bold text-green-600">{formatCOP(ventas.filter(v=>v.estado_pago==='Pagado').reduce((s,v)=>s+(parseFloat(v.total)||0),0))}</span>
+                                            </div>
+                                            <div className="flex justify-between p-4 bg-red-50 rounded-xl">
+                                                <span className="font-medium">Pendientes</span>
+                                                <span className="font-bold text-red-600">{formatCOP(ventasPendientes)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-6 rounded-2xl shadow-xl border-l-8 border-blue-500">
+                                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><span>⏳</span> Pagos Pendientes</h3>
+                                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                                            {ventas.filter(v=>v.estado_pago==='Pendiente').slice(0,6).map(v=>(
+                                                <div key={v.id} className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl hover:bg-yellow-100 transition">
+                                                    <div>
+                                                        <p className="font-medium text-gray-800">{v.clientes?.nombre}</p>
+                                                        <p className="text-xs text-gray-500">{v.cantidad} {v.tipo_cantidad}</p>
+                                                    </div>
+                                                    <span className="font-bold text-red-600">{formatCOP((parseFloat(v.total)||0)-(parseFloat(v.abono)||0))}</span>
+                                                </div>
+                                            ))}
+                                            {ventas.filter(v=>v.estado_pago==='Pendiente').length===0 && <p className="text-center py-8 text-gray-400">✅ Todo al día</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'clientes' && (
+                            <div className="space-y-6 fade-in">
+                                <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-green-500">
+                                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>➕</span> Agregar Cliente</h2>
+                                    <form onSubmit={addCliente} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <input value={clienteForm.nombre} onChange={(e)=>setClienteForm({...clienteForm, nombre:e.target.value})} placeholder="Nombre completo *" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" required />
+                                        <input value={clienteForm.direccion} onChange={(e)=>setClienteForm({...clienteForm, direccion:e.target.value})} placeholder="Dirección" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                                        <select value={clienteForm.tipo_cliente} onChange={(e)=>setClienteForm({...clienteForm, tipo_cliente:e.target.value})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                            <option value="Individual">Individual</option>
+                                            <option value="Contrato">Contrato</option>
+                                        </select>
+                                        <select value={clienteForm.dia_entrega} onChange={(e)=>setClienteForm({...clienteForm, dia_entrega:e.target.value})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                            <option value="">Día de entrega</option>
+                                            <option value="Lunes">Lunes</option>
+                                            <option value="Martes">Martes</option>
+                                            <option value="Miércoles">Miércoles</option>
+                                            <option value="Jueves">Jueves</option>
+                                            <option value="Viernes">Viernes</option>
+                                            <option value="Sábado">Sábado</option>
+                                            <option value="Domingo">Domingo</option>
+                                        </select>
+                                        <input value={clienteForm.precio_especial} onChange={(e)=>setClienteForm({...clienteForm, precio_especial:e.target.value})} placeholder="Precio especial" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                                        <input value={clienteForm.notas} onChange={(e)=>setClienteForm({...clienteForm, notas:e.target.value})} placeholder="Notas adicionales" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                                        <button type="submit" className="md:col-span-3 bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold text-lg hover:from-green-600 hover:to-green-700 transition shadow-lg pulse-hover">✅ Agregar Cliente</button>
+                                    </form>
+                                </div>
+
+                                <div className="bg-white p-8 rounded-2xl shadow-xl">
+                                    <h2 className="text-2xl font-bold mb-6">Lista de Clientes ({clientes.filter(c=>c.activo!==false).length})</h2>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead><tr className="bg-gray-50"><th className="p-4 text-left font-semibold">Nombre</th><th className="p-4 text-left font-semibold">Tipo</th><th className="p-4 text-left font-semibold">Día</th><th className="p-4 text-left font-semibold">Acciones</th></tr></thead>
+                                            <tbody>
+                                                {clientes.filter(c=>c.activo!==false).map(c=>(
+                                                    <tr key={c.id} className="border-t hover:bg-gray-50 transition">
+                                                        <td className="p-4 font-medium">{c.nombre}</td>
+                                                        <td className="p-4">
+                                                            <select value={c.tipo_cliente||'Individual'} onChange={(e)=>updateTipoCliente(c.id, e.target.value)} className="px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                                                <option value="Individual">Individual</option>
+                                                                <option value="Contrato">Contrato</option>
+                                                            </select>
+                                                        </td>
+                                                        <td className="p-4">{c.dia_entrega||'-'}</td>
+                                                        <td className="p-4">
+                                                            <button onClick={()=>deleteCliente(c.id)} className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium">🗑️ Eliminar</button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'ventas' && (
+                            <div className="space-y-6 fade-in">
+                                <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-orange-500">
+                                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>🛒</span> Registrar Venta</h2>
+                                    <form onSubmit={addVenta} className="space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <select value={ventaForm.cliente_id} onChange={(e)=>setVentaForm({...ventaForm, cliente_id:e.target.value})} required className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                                <option value="">Seleccionar Cliente *</option>
+                                                {clientes.filter(c=>c.activo!==false).map(c=>(<option key={c.id} value={c.id}>{c.nombre} ({c.tipo_cliente})</option>))}
+                                            </select>
+                                            <select value={ventaForm.tipo_cantidad} onChange={(e)=>setVentaForm({...ventaForm, tipo_cantidad:e.target.value, cantidad:'', total:''})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                                <option value="Unidades">🌽 Unidades ($600 c/u)</option>
+                                                <option value="Paquetes">📦 Paquetes ($6,000 c/u)</option>
+                                            </select>
+                                            <input type="date" value={egresoForm.fecha} onChange={(e)=>setEgresoForm({...egresoForm,fecha:e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                                            <button type="submit" className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-xl font-bold hover:from-red-600 hover:to-red-700 transition shadow-lg pulse-hover">✅ Agregar</button>
+                                        </form>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="bg-white p-8 rounded-2xl shadow-xl">
+                                        <h3 className="text-xl font-bold mb-6 text-green-600 flex items-center gap-2"><span>💵</span> Ingresos ({ingresos.length})</h3>
+                                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                                            {ingresos.map(ing => (
+                                                <div key={ing.id} className="flex justify-between items-center p-4 bg-green-50 rounded-xl hover:bg-green-100 transition border-l-4 border-green-500">
+                                                    <div className="flex-1">
+                                                        <p className="font-medium text-gray-800">{ing.concepto}</p>
+                                                        <p className="text-sm text-gray-500">{ing.fecha? new Date(ing.fecha).toLocaleDateString('es-CO'):''}</p>
+                                                    </div>
+                                                    <div className="flex gap-3 items-center">
+                                                        <span className="font-bold text-green-600 text-lg">{formatCOP(ing.monto)}</span>
+                                                        <button onClick={()=>deleteIngreso(ing.id)} className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-medium">🗑️</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {ingresos.length===0 && <p className="text-center py-8 text-gray-400">Sin registros</p>}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-8 rounded-2xl shadow-xl">
+                                        <h3 className="text-xl font-bold mb-6 text-red-600 flex items-center gap-2"><span>💸</span> Egresos ({egresos.length})</h3>
+                                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                                            {egresos.map(egr => (
+                                                <div key={egr.id} className="flex justify-between items-center p-4 bg-red-50 rounded-xl hover:bg-red-100 transition border-l-4 border-red-500">
+                                                    <div className="flex-1">
+                                                        <p className="font-medium text-gray-800">{egr.concepto}</p>
+                                                        <p className="text-sm text-gray-500">{egr.fecha? new Date(egr.fecha).toLocaleDateString('es-CO'):''}</p>
+                                                    </div>
+                                                    <div className="flex gap-3 items-center">
+                                                        <span className="font-bold text-red-600 text-lg">{formatCOP(egr.monto)}</span>
+                                                        <button onClick={()=>deleteEgreso(egr.id)} className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-medium">🗑️</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {egresos.length===0 && <p className="text-center py-8 text-gray-400">Sin registros</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'resumen' && (
+                            <div className="space-y-6 fade-in">
+                                <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-purple-500">
+                                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>📊</span> Resumen General</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Desde</label>
+                                            <input type="date" value={resDesde} onChange={(e)=>setResDesde(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Hasta</label>
+                                            <input type="date" value={resHasta} onChange={(e)=>setResHasta(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500" />
+                                        </div>
+                                        <div className="flex items-end">
+                                            <button onClick={()=>{setResDesde('');setResHasta('');}} className="w-full px-6 py-4 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition">🔄 Limpiar</button>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="bg-gradient-to-br from-amber-500 to-orange-600 text-white p-6 rounded-2xl shadow-xl pulse-hover">
+                                            <p className="text-amber-100 text-sm font-medium mb-2">Total Ventas</p>
+                                            <p className="text-3xl font-bold">{formatCOP(resumen.totalVentas)}</p>
+                                        </div>
+
+                                        <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-2xl shadow-xl pulse-hover">
+                                            <p className="text-green-100 text-sm font-medium mb-2">Total Abonos</p>
+                                            <p className="text-3xl font-bold">{formatCOP(resumen.totalAbonos)}</p>
+                                        </div>
+
+                                        <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-6 rounded-2xl shadow-xl pulse-hover">
+                                            <p className="text-red-100 text-sm font-medium mb-2">Saldo Pendiente</p>
+                                            <p className="text-3xl font-bold">{formatCOP(resumen.totalSaldo)}</p>
+                                        </div>
+
+                                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-2xl shadow-xl pulse-hover">
+                                            <p className="text-blue-100 text-sm font-medium mb-2">Ingresos</p>
+                                            <p className="text-3xl font-bold">{formatCOP(resumen.totalIngresos)}</p>
+                                        </div>
+
+                                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-2xl shadow-xl pulse-hover">
+                                            <p className="text-purple-100 text-sm font-medium mb-2">Egresos</p>
+                                            <p className="text-3xl font-bold">{formatCOP(resumen.totalEgresos)}</p>
+                                        </div>
+
+                                        <div className="bg-gradient-to-br from-gray-700 to-gray-800 text-white p-6 rounded-2xl shadow-xl pulse-hover">
+                                            <p className="text-gray-300 text-sm font-medium mb-2">Balance Final</p>
+                                            <p className="text-3xl font-bold">{formatCOP(resumen.totalIngresos - resumen.totalEgresos)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-8 rounded-2xl shadow-xl">
+                                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><span>📋</span> Detalles del Período</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-300">
+                                            <p className="text-sm text-blue-700 font-semibold mb-2">Ventas Totales</p>
+                                            <p className="text-4xl font-bold text-blue-600 mb-4">{formatCOP(resumen.totalVentas)}</p>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-blue-700">Abonado:</span>
+                                                    <span className="font-bold text-green-600">{formatCOP(resumen.totalAbonos)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-blue-700">Por cobrar:</span>
+                                                    <span className="font-bold text-red-600">{formatCOP(resumen.totalSaldo)}</span>
+                                                </div>
+                                                <div className="pt-2 border-t-2 border-blue-300">
+                                                    <div className="flex justify-between">
+                                                        <span className="font-bold text-blue-800">Efectivo real:</span>
+                                                        <span className="font-bold text-blue-800 text-lg">{formatCOP(resumen.totalAbonos)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border-2 border-purple-300">
+                                            <p className="text-sm text-purple-700 font-semibold mb-2">Balance Neto</p>
+                                            <p className="text-4xl font-bold text-purple-600 mb-4">{formatCOP(resumen.totalIngresos - resumen.totalEgresos)}</p>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-purple-700">Total ingresos:</span>
+                                                    <span className="font-bold text-green-600">{formatCOP(resumen.totalIngresos)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-purple-700">Total egresos:</span>
+                                                    <span className="font-bold text-red-600">{formatCOP(resumen.totalEgresos)}</span>
+                                                </div>
+                                                <div className="pt-2 border-t-2 border-purple-300">
+                                                    <div className="flex justify-between">
+                                                        <span className="font-bold text-purple-800">Utilidad:</span>
+                                                        <span className={`font-bold text-lg ${(resumen.totalIngresos - resumen.totalEgresos) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                            {formatCOP(resumen.totalIngresos - resumen.totalEgresos)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gradient-to-r from-amber-100 to-orange-100 p-8 rounded-2xl shadow-xl border-2 border-orange-300">
+                                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-orange-800">
+                                        <span>💡</span> Análisis Rápido
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="bg-white p-4 rounded-xl shadow">
+                                            <p className="text-sm text-gray-600 mb-1">Tasa de cobro</p>
+                                            <p className="text-2xl font-bold text-blue-600">
+                                                {resumen.totalVentas > 0 ? Math.round((resumen.totalAbonos / resumen.totalVentas) * 100) : 0}%
+                                            </p>
+                                        </div>
+                                        <div className="bg-white p-4 rounded-xl shadow">
+                                            <p className="text-sm text-gray-600 mb-1">Clientes activos</p>
+                                            <p className="text-2xl font-bold text-green-600">{clientes.filter(c=>c.activo!==false).length}</p>
+                                        </div>
+                                        <div className="bg-white p-4 rounded-xl shadow">
+                                            <p className="text-sm text-gray-600 mb-1">Ventas registradas</p>
+                                            <p className="text-2xl font-bold text-orange-600">{ventas.length}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <Toast toasts={toasts} remove={removeToast} />
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>number" min="1" value={ventaForm.cantidad} onChange={(e)=>setVentaForm({...ventaForm, cantidad:e.target.value})} placeholder="Cantidad *" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" required />
+                                        </div>
+
+                                        {ventaForm.precio_sugerido > 0 && (
+                                            <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <p className="text-sm text-blue-700 font-medium mb-1">💡 Precio Sugerido</p>
+                                                        <p className="text-3xl font-bold text-blue-600">{formatCOP(ventaForm.precio_sugerido)}</p>
+                                                    </div>
+                                                    <button type="button" onClick={()=>setVentaForm({...ventaForm, total:ventaForm.precio_sugerido})} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg pulse-hover">✨ Usar</button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <input type="number" placeholder="Total *" value={ventaForm.total} onChange={(e)=>setVentaForm({...ventaForm, total:e.target.value})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" required />
+                                            <input type="number" placeholder="Abono (opcional)" value={ventaForm.abono} onChange={(e)=>setVentaForm({...ventaForm, abono:e.target.value})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                            <select value={ventaForm.estado_pago} onChange={(e)=>setVentaForm({...ventaForm, estado_pago:e.target.value})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                                <option value="Pendiente">⏳ Pendiente</option>
+                                                <option value="Pagado">✅ Pagado</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <input value={ventaForm.semana} onChange={(e)=>setVentaForm({...ventaForm, semana:e.target.value})} placeholder="Semana (ej: Semana 42)" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                            <input type="date" value={ventaForm.fecha} onChange={(e)=>setVentaForm({...ventaForm, fecha:e.target.value})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                            <input value={ventaForm.notas} onChange={(e)=>setVentaForm({...ventaForm, notas:e.target.value})} placeholder="Notas" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                        </div>
+
+                                        <button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white p-5 rounded-xl font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition shadow-lg pulse-hover">🚀 Registrar Venta</button>
+                                    </form>
+                                </div>
+
+                                <div className="bg-white p-8 rounded-2xl shadow-xl">
+                                    <h2 className="text-2xl font-bold mb-6">Filtros y Búsqueda</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                        <input type="date" value={filterDate} onChange={(e)=>setFilterDate(e.target.value)} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" />
+                                        <select value={filterEstado} onChange={(e)=>setFilterEstado(e.target.value)} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500">
+                                            <option value="Todos">Todas</option>
+                                            <option value="Pagadas">✅ Pagadas</option>
+                                            <option value="Pendientes">⏳ Pendientes</option>
+                                        </select>
+                                        <button onClick={()=>{ setFilterDate(''); setFilterEstado('Todos'); }} className="px-6 py-4 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition">🔄 Limpiar</button>
+                                    </div>
+
+                                    {filterDate && (
+                                        <div className="mb-6 p-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border-2 border-orange-300">
+                                            {(()=>{
+                                                const ventasPorFecha = ventas.filter(v=>v.fecha && v.fecha.slice(0,10)===filterDate);
+                                                const total = ventasPorFecha.reduce((s,v)=>s+(parseFloat(v.total)||0),0);
+                                                const unidades = ventasPorFecha.reduce((s,v)=>{ if(v.tipo_cantidad==='Paquetes') return s + ((parseInt(v.cantidad)||0)*10); return s + (parseInt(v.cantidad)||0); },0);
+                                                return (
+                                                    <div>
+                                                        <p className="text-lg font-bold text-orange-700 mb-3">📅 Ventas del {filterDate}</p>
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                                            <div className="bg-white p-4 rounded-xl shadow">
+                                                                <p className="text-sm text-gray-600">Total</p>
+                                                                <p className="text-2xl font-bold text-green-600">{formatCOP(total)}</p>
+                                                            </div>
+                                                            <div className="bg-white p-4 rounded-xl shadow">
+                                                                <p className="text-sm text-gray-600">Unidades</p>
+                                                                <p className="text-2xl font-bold text-blue-600">{unidades}</p>
+                                                            </div>
+                                                            <div className="bg-white p-4 rounded-xl shadow">
+                                                                <p className="text-sm text-gray-600">Paquetes</p>
+                                                                <p className="text-2xl font-bold text-purple-600">{Math.floor(unidades/10)} + {unidades%10}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    )}
+
+                                    <h3 className="text-xl font-bold mb-4">Historial ({ventasFiltradas.length})</h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead><tr className="bg-gray-50"><th className="p-4 text-left font-semibold">Cliente</th><th className="p-4 text-left font-semibold">Cantidad</th><th className="p-4 text-left font-semibold">Total</th><th className="p-4 text-left font-semibold">Abono</th><th className="p-4 text-left font-semibold">Saldo</th><th className="p-4 text-left font-semibold">Estado</th><th className="p-4 text-left font-semibold">Fecha</th><th className="p-4 text-left font-semibold">Acciones</th></tr></thead>
+                                            <tbody>
+                                                {ventasFiltradas.map(v => {
+                                                    const total = parseFloat(v.total)||0;
+                                                    const abono = parseFloat(v.abono)||0;
+                                                    const saldo = total - abono;
+                                                    return (
+                                                        <tr key={v.id} className="border-t hover:bg-gray-50 transition">
+                                                            <td className="p-4 font-medium">{v.clientes?.nombre||'N/A'}</td>
+                                                            <td className="p-4">{v.cantidad} {v.tipo_cantidad}</td>
+                                                            <td className="p-4 font-bold text-green-600">{formatCOP(total)}</td>
+                                                            <td className="p-4">
+                                                                <span className={`font-bold ${abono > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                                                                    {formatCOP(abono)}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <span className={`font-bold ${saldo > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                                    {formatCOP(saldo)}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <button onClick={()=>{ 
+                                                                    if(v.estado_pago==='Pagado'){ 
+                                                                        if(confirm('¿Marcar como pendiente?')) setPagoVenta(v,'Pendiente'); 
+                                                                    } else { 
+                                                                        if(confirm('¿Marcar como pagado completamente?')) setPagoVenta(v,'Pagado'); 
+                                                                    } 
+                                                                }} className={`px-4 py-2 rounded-xl font-medium transition ${v.estado_pago==='Pagado' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
+                                                                    {v.estado_pago==='Pagado'? '✅ Pagado':'⏳ Pendiente'}
+                                                                </button>
+                                                            </td>
+                                                            <td className="p-4"><input type="date" defaultValue={v.fecha? v.fecha.slice(0,10):''} onBlur={(e)=>updateFechaVenta(v.id,e.target.value)} className="p-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500" /></td>
+                                                            <td className="p-4">
+                                                                <div className="flex gap-2 flex-wrap">
+                                                                    <button onClick={()=>{ 
+                                                                        const ab = prompt(`Agregar abono (Saldo: ${formatCOP(saldo)}):`); 
+                                                                        if(!ab || ab==='') return; 
+                                                                        const monto = parseFloat(ab);
+                                                                        if(isNaN(monto) || monto <= 0) {
+                                                                            alert('Ingresa un monto válido');
+                                                                            return;
+                                                                        }
+                                                                        if(monto > saldo) {
+                                                                            alert('El abono no puede ser mayor al saldo');
+                                                                            return;
+                                                                        }
+                                                                        setPagoVenta(v,'Abono',monto);
+                                                                    }} className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium text-sm">💰 Abonar</button>
+                                                                    <button onClick={()=>deleteVenta(v.id)} className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium text-sm">🗑️</button>
+                                                                    {v.notas && <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs" title={v.notas}>📝</span>}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'contabilidad' && (
+                            <div className="space-y-6 fade-in">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-green-500">
+                                        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>📈</span> Agregar Ingreso</h2>
+                                        <form onSubmit={addIngreso} className="space-y-4">
+                                            <input value={ingresoForm.concepto} onChange={(e)=>setIngresoForm({...ingresoForm,concepto:e.target.value})} placeholder="Concepto" className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" required />
+                                            <input type="number" step="100" value={ingresoForm.monto} onChange={(e)=>setIngresoForm({...ingresoForm,monto:e.target.value})} placeholder="Monto" className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" required />
+                                            <input type="date" value={ingresoForm.fecha} onChange={(e)=>setIngresoForm({...ingresoForm,fecha:e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                                            <button type="submit" className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold hover:from-green-600 hover:to-green-700 transition shadow-lg pulse-hover">✅ Agregar</button>
+                                        </form>
+                                    </div>
+
+                                    <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-red-500">
+                                        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>📉</span> Agregar Egreso</h2>
+                                        <form onSubmit={addEgreso} className="space-y-4">
+                                            <input value={egresoForm.concepto} onChange={(e)=>setEgresoForm({...egresoForm,concepto:e.target.value})} placeholder="Concepto" className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" required />
+                                            <input type="number" step="100" value={egresoForm.monto} onChange={(e)=>setEgresoForm({...egresoForm,monto:e.target.value})} placeholder="Monto" className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" required />
+                                            <input type="
