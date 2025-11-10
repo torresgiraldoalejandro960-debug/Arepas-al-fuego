@@ -75,7 +75,7 @@
                         <button 
                             onClick={onEnter}
                             className="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-12 py-5 rounded-full font-bold text-xl hover:from-amber-700 hover:to-orange-700 transition shadow-2xl pulse-hover">
-                            🚀 Entrar al Sistema
+                            🚀 Entrar pa'voltear la Arepa
                         </button>
                     </div>
                 </div>
@@ -109,7 +109,7 @@
                             <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-5 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center shadow-lg pulse-hover">
                                 <span className="text-6xl">🔥</span>
                             </div>
-                            <h1 className="text-4xl font-bold gradient-text mb-3">Arepas al Fuego</h1>
+                            <h1 className="text-4xl font-bold gradient-text mb-3">Arepas al Carbon</h1>
                             <p className="text-gray-600 text-lg">Sistema de Gestión</p>
                         </div>
 
@@ -139,111 +139,146 @@
             );
         }
 
-        function HistorialCompras({ clientes, ventas, pushToast, loadData, supabaseClient, formatCOP }) {
+        function HistorialCompras({ clientes, ventas, pushToast, loadData, supabaseClient, formatCOP, darkMode }) {
             const [selectedCliente, setSelectedCliente] = useState(null);
             const [abonoTotal, setAbonoTotal] = useState('');
 
-            const calcularDeudaPorCliente = () => {
-                const deudas = {};
+          const calcularDeudaPorCliente = () => {
+    const deudas = {};
+    
+    clientes.filter(c => c.activo !== false).forEach(cliente => {
+        const ventasCliente = ventas.filter(v => v.cliente_id === cliente.id && v.estado_pago === 'Pendiente');
+        
+        if (ventasCliente.length > 0) {
+            const fechas = {};
+            ventasCliente.forEach(v => {
+                let fecha = 'Sin fecha';
+                if (v.fecha) {
+                    const fechaObj = new Date(v.fecha);
+                    const year = fechaObj.getUTCFullYear();
+                    const month = String(fechaObj.getUTCMonth() + 1).padStart(2, '0');
+                    const day = String(fechaObj.getUTCDate()).padStart(2, '0');
+                    fecha = `${day}/${month}/${year}`;
+                }
                 
-                clientes.filter(c => c.activo !== false).forEach(cliente => {
-                    const ventasCliente = ventas.filter(v => v.cliente_id === cliente.id && v.estado_pago === 'Pendiente');
-                    
-                    if (ventasCliente.length > 0) {
-                        const fechas = {};
-                        ventasCliente.forEach(v => {
-                            const fecha = v.fecha ? new Date(v.fecha).toLocaleDateString('es-CO') : 'Sin fecha';
-                            const deuda = (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0);
-                            
-                            if (!fechas[fecha]) {
-                                fechas[fecha] = { fecha, deuda: 0, ventas: [] };
-                            }
-                            fechas[fecha].deuda += deuda;
-                            fechas[fecha].ventas.push(v);
-                        });
-                        
-                        // Ordenar por fecha
-                        const fechasArray = Object.values(fechas).sort((a, b) => {
-                            if (a.fecha === 'Sin fecha') return 1;
-                            if (b.fecha === 'Sin fecha') return -1;
-                            return new Date(a.ventas[0].fecha) - new Date(b.ventas[0].fecha);
-                        });
-                        const totalDeuda = fechasArray.reduce((sum, f) => sum + f.deuda, 0);
-                        
-                        if (totalDeuda > 0) {
-                            deudas[cliente.id] = {
-                                cliente,
-                                fechas: fechasArray,
-                                totalDeuda,
-                                cantidadFechas: fechasArray.length
-                            };
-                        }
-                    }
-                });
+                const deuda = (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0);
                 
-                return deudas;
-            };
-
-            const handleAbonoTotal = async () => {
-                if (!selectedCliente || !abonoTotal) {
-                    pushToast('Ingresa un monto válido', 'error');
-                    return;
+                if (!fechas[fecha]) {
+                    fechas[fecha] = { fecha, deuda: 0, ventas: [] };
                 }
+                fechas[fecha].deuda += deuda;
+                fechas[fecha].ventas.push(v);
+            });
+            
+            const fechasArray = Object.values(fechas).sort((a, b) => {
+                if (a.fecha === 'Sin fecha') return 1;
+                if (b.fecha === 'Sin fecha') return -1;
+                return new Date(a.ventas[0].fecha) - new Date(b.ventas[0].fecha);
+            });
+            const totalDeuda = fechasArray.reduce((sum, f) => sum + f.deuda, 0);
+            
+            if (totalDeuda > 0) {
+                deudas[cliente.id] = {
+                    cliente,
+                    fechas: fechasArray,
+                    totalDeuda,
+                    cantidadFechas: fechasArray.length
+                };
+            }
+        }
+    });
+    
+    return deudas;
+};
 
-                const monto = parseFloat(abonoTotal);
-                if (isNaN(monto) || monto <= 0) {
-                    pushToast('Ingresa un monto válido', 'error');
-                    return;
-                }
+           const handleAbonoTotal = async () => {
+    if (!selectedCliente || !abonoTotal) {
+        pushToast('Ingresa un monto válido', 'error');
+        return;
+    }
 
-                const deudaInfo = deudas[selectedCliente];
-                if (monto > deudaInfo.totalDeuda) {
-                    pushToast('El abono no puede ser mayor a la deuda total', 'error');
-                    return;
-                }
+    const monto = parseFloat(abonoTotal);
+    if (isNaN(monto) || monto <= 0) {
+        pushToast('Ingresa un monto válido', 'error');
+        return;
+    }
 
-                let montoRestante = monto;
+    const deudaInfo = deudas[selectedCliente];
+    if (monto > deudaInfo.totalDeuda) {
+        pushToast('El abono no puede ser mayor a la deuda total', 'error');
+        return;
+    }
+
+    let montoRestante = monto;
+    const ventasActualizadas = [];
+    
+    try {
+        for (const fechaInfo of deudaInfo.fechas) {
+            if (montoRestante <= 0) break;
+            
+            for (const venta of fechaInfo.ventas) {
+                if (montoRestante <= 0) break;
                 
-                for (const fechaInfo of deudaInfo.fechas) {
-                    if (montoRestante <= 0) break;
-                    
-                    for (const venta of fechaInfo.ventas) {
-                        if (montoRestante <= 0) break;
-                        
-                        const deudaVenta = (parseFloat(venta.total) || 0) - (parseFloat(venta.abono) || 0);
-                        const abonoVenta = Math.min(montoRestante, deudaVenta);
-                        const nuevoAbono = (parseFloat(venta.abono) || 0) + abonoVenta;
-                        const nuevoEstado = nuevoAbono >= parseFloat(venta.total) ? 'Pagado' : 'Pendiente';
-                        
-                        await supabaseClient.from('ventas').update({
-                            abono: nuevoAbono,
-                            estado_pago: nuevoEstado
-                        }).eq('id', venta.id);
-                        
-                        montoRestante -= abonoVenta;
-                    }
+                const deudaVenta = (parseFloat(venta.total) || 0) - (parseFloat(venta.abono) || 0);
+                const abonoVenta = Math.min(montoRestante, deudaVenta);
+                const nuevoAbono = (parseFloat(venta.abono) || 0) + abonoVenta;
+                const nuevoEstado = nuevoAbono >= parseFloat(venta.total) ? 'Pagado' : 'Pendiente';
+                
+                // Actualizar la venta
+                const { error: errorVenta } = await supabaseClient.from('ventas').update({
+                    abono: nuevoAbono,
+                    estado_pago: nuevoEstado
+                }).eq('id', venta.id);
+                
+                if (errorVenta) {
+                    console.error('Error actualizando venta:', errorVenta);
+                    pushToast('Error al actualizar venta', 'error');
+                    continue;
                 }
+                
+                // Registrar el ingreso
+                const { data: ingresoData, error: errorIngreso } = await supabaseClient.from('ingresos').insert({
+                    concepto: `Abono - ${deudaInfo.cliente.nombre} [ID:${venta.id}]`,
+                    monto: abonoVenta,
+                    categoria: 'Abono',
+                    fecha: new Date().toISOString(),
+                    notas: `venta_id:${venta.id}`
+                }).select();
+                
+                if (errorIngreso) {
+                    console.error('Error registrando ingreso:', errorIngreso);
+                    pushToast('Error al registrar ingreso: ' + errorIngreso.message, 'error');
+                } else {
+                    console.log('✅ Ingreso registrado:', ingresoData);
+                    ventasActualizadas.push({id: venta.id, monto: abonoVenta});
+                }
+                
+                montoRestante -= abonoVenta;
+            }
+        }
 
-                await supabaseClient.from('ingresos').insert({
-    concepto: `Abono general - ${deudaInfo.cliente.nombre}`,
-    monto: monto,
-    categoria: 'Abono',
-    fecha: new Date().toISOString(),
-    notas: 'abono_multiple'
-});
-
-                pushToast('✅ Abono aplicado correctamente');
-                setAbonoTotal('');
-                setSelectedCliente(null);
-                loadData();
-            };
-
+        if (ventasActualizadas.length > 0) {
+            pushToast(`✅ Abono de ${formatCOP(monto)} aplicado a ${ventasActualizadas.length} venta(s)`);
+        } else {
+            pushToast('No se pudieron aplicar los abonos', 'error');
+        }
+        
+        setAbonoTotal('');
+        setSelectedCliente(null);
+        await loadData();
+        
+    } catch (err) {
+        console.error('Error en handleAbonoTotal:', err);
+        pushToast('Error al procesar el abono', 'error');
+    }
+};
             const deudas = calcularDeudaPorCliente();
-            const clientesConDeuda = Object.values(deudas);
-
+            const clientesConDeuda = Object.values(deudas).sort((a, b) => 
+             a.cliente.nombre.localeCompare(b.cliente.nombre, 'es', { sensitivity: 'base' })
+);
             return (
                 <div className="space-y-6 fade-in">
-                    <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-purple-500">
+                   <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-purple-500`}>
                         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
                             <span>📋</span> Historial de Compras y Deudas por Fecha
                         </h2>
@@ -256,37 +291,37 @@
                         ) : (
                             <div className="space-y-6">
                                 {clientesConDeuda.map(deudaInfo => (
-                                    <div key={deudaInfo.cliente.id} className="border-2 border-gray-200 rounded-xl p-6 hover:border-orange-300 transition">
+                                   <div key={deudaInfo.cliente.id} className={`border-2 ${darkMode ? 'border-gray-600 bg-gray-750' : 'border-gray-200 bg-white'} rounded-xl p-6 hover:border-orange-300 transition`}>
                                         <div className="flex justify-between items-start mb-4">
                                             <div>
-                                                <h3 className="text-2xl font-bold text-gray-800">{deudaInfo.cliente.nombre}</h3>
-                                                <p className="text-sm text-gray-500">Debe en {deudaInfo.cantidadFechas} fecha(s)</p>
+                                                <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>{deudaInfo.cliente.nombre}</h3>
+                                                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Debe en {deudaInfo.cantidadFechas} fecha(s)</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-sm text-gray-600 mb-1">Total Deuda</p>
+                                               <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Total Deuda</p>
                                                 <p className="text-3xl font-bold text-red-600">{formatCOP(deudaInfo.totalDeuda)}</p>
                                             </div>
                                         </div>
 
                                         <div className="space-y-3 mb-4">
                                             {deudaInfo.fechas.map((fechaInfo, idx) => (
-                                                <div key={idx} className="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+                                               <div key={idx} className={`${darkMode ? 'bg-red-900/30' : 'bg-red-50'} p-4 rounded-lg border-l-4 border-red-500`}>
                                                     <div className="flex justify-between items-center mb-2">
-                                                        <span className="font-semibold text-gray-700">📅 {fechaInfo.fecha}</span>
+                                                       <span className={`font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>📅 {fechaInfo.fecha}</span>
                                                         <span className="font-bold text-red-600">{formatCOP(fechaInfo.deuda)}</span>
                                                     </div>
                                                     <div className="space-y-2 mt-3">
                                                         {fechaInfo.ventas.map((venta, vIdx) => (
-                                                            <div key={vIdx} className="bg-white p-3 rounded-lg text-sm">
+                                                            <div key={vIdx} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 rounded-lg text-sm`}>
                                                                 <div className="flex justify-between items-center">
                                                                     <div>
-                                                                        <span className="text-gray-600">Semana: </span>
-                                                                        <span className="font-semibold">{venta.semana || 'N/A'}</span>
-                                                                        <span className="text-gray-600 ml-3">Cantidad: </span>
-                                                                        <span className="font-semibold">{venta.cantidad} {venta.tipo_cantidad}</span>
+                                                                       <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Semana: </span>
+                                                                       <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{venta.semana || 'N/A'}</span>
+                                                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} ml-3`}>Cantidad: </span>
+                                                                       <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{venta.cantidad} {venta.tipo_cantidad}</span>
                                                                     </div>
                                                                     <div className="text-right">
-                                                                        <p className="text-xs text-gray-500">Total: {formatCOP(venta.total)}</p>
+                                                                     <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total: {formatCOP(venta.total)}</p>
                                                                         <p className="text-xs text-blue-600">Abonado: {formatCOP(venta.abono || 0)}</p>
                                                                         <p className="text-xs text-red-600 font-bold">Debe: {formatCOP((parseFloat(venta.total) || 0) - (parseFloat(venta.abono) || 0))}</p>
                                                                     </div>
@@ -356,6 +391,15 @@
             const [egresoForm, setEgresoForm] = useState({concepto:'',monto:'',categoria:'',fecha:''});
             const [filterDate, setFilterDate] = useState('');
             const [filterEstado, setFilterEstado] = useState('Todos');
+            const [notaModal, setNotaModal] = useState(null);
+            const [pedidosProgramados, setPedidosProgramados] = useState([]);
+            const [pedidoForm, setPedidoForm] = useState({fecha:'',cliente_id:'',cantidad:'',tipo_cantidad:'Unidades',notas:''});
+            const [fechaSeleccionadaPedidos, setFechaSeleccionadaPedidos] = useState('');
+            const [ordenAlfabetico, set0rdenAlfabetico] = useState(false);
+            const [ordenAlfabeticoClientes, setOrdenAlfabeticoClientes] = useState(false);
+            const [darkMode, setDarkMode] = useState(false);
+            const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+            const [mostrarPerfilCliente, setMostrarPerfilCliente] = useState(false);
             const [resDesde, setResDesde] = useState('');
             const [resHasta, setResHasta] = useState('');
 
@@ -378,6 +422,8 @@
                     const { data: vs } = await supabaseClient.from('ventas').select('*, clientes(nombre)').order('fecha',{ascending:false});
                     const { data: ing } = await supabaseClient.from('ingresos').select('*').order('fecha',{ascending:false});
                     const { data: egr } = await supabaseClient.from('egresos').select('*').order('fecha',{ascending:false});
+                    const { data: ped } = await supabaseClient.from('pedidos_programados').select('*, clientes(nombre)').order('fecha',{ascending:true});
+                    setPedidosProgramados(ped||[]);
                     setClientes(cl||[]);
                     setVentas(vs||[]);
                     setIngresos(ing||[]);
@@ -467,27 +513,33 @@ if(error){
     return; 
 }
 
-// Ahora ventaCreada contiene el ID de la venta creada
+// Obtener el ID de la venta recién creada
 const ventaId = ventaCreada?.[0]?.id;
 
-                if(ventaForm.estado_pago==='Pagado'){ 
+// Registrar ingreso si está pagado completamente
+if(ventaForm.estado_pago==='Pagado' && ventaId){ 
     await supabaseClient.from('ingresos').insert({
         concepto:`Venta - ${clienteDisplay(ventaForm.cliente_id)} [ID:${ventaId}]`,
         monto:total,
         categoria:'Venta',
-        fecha:fechaISO
+        fecha:fechaISO,
+        notas: `venta_id:${ventaId}`
     }).select(); 
-} else if(abono>0 && ventaId){ 
+} 
+// Registrar ingreso por abono parcial
+else if(abono>0 && ventaId){ 
     await supabaseClient.from('ingresos').insert({
         concepto:`Abono - ${clienteDisplay(ventaForm.cliente_id)} [ID:${ventaId}]`,
         monto:abono,
         categoria:'Abono',
-        fecha:fechaISO
+        fecha:fechaISO,
+        notas: `venta_id:${ventaId}`
     }).select(); 
 }
-                pushToast('✅ Venta registrada'); 
-                setVentaForm({cliente_id:'',semana:'',tipo_venta:'Individual',cantidad:'',tipo_cantidad:'Unidades',precio_unitario:'',precio_sugerido:'',total:'',estado_pago:'Pendiente',fecha:'',payment_type:'Total',abono:'',notas:''}); 
-                loadData(); 
+
+pushToast('✅ Venta registrada'); 
+setVentaForm({cliente_id:'',semana:'',tipo_venta:'Individual',cantidad:'',tipo_cantidad:'Unidades',precio_unitario:'',precio_sugerido:'',total:'',estado_pago:'Pendiente',fecha:'',payment_type:'Total',abono:'',notas:''}); 
+loadData();
             };
 
             const deleteVenta = async (id)=>{ 
@@ -512,12 +564,13 @@ const ventaId = ventaCreada?.[0]?.id;
                         pushToast('Error: ' + error.message,'error'); 
                         return;
                     }
-                    await supabaseClient.from('ingresos').insert({
+                   await supabaseClient.from('ingresos').insert({
     concepto:`Venta - ${v.clientes?.nombre} [ID:${v.id}]`,
     monto:total-actualAbono,
     categoria:'Venta',
-    fecha:new Date().toISOString()
-}).select();
+    fecha:new Date().toISOString(),
+    notas: `venta_id:${v.id}`
+}).select(); 
                     pushToast('✅ Marcado como pagado'); 
                 } else if(action==='Abono'){ 
                     const nuevoAbono = actualAbono + (parseFloat(abonoMonto)||0); 
@@ -532,7 +585,8 @@ const ventaId = ventaCreada?.[0]?.id;
     concepto:`Abono - ${v.clientes?.nombre} [ID:${v.id}]`,
     monto:parseFloat(abonoMonto)||0,
     categoria:'Abono',
-    fecha:new Date().toISOString()
+    fecha:new Date().toISOString(),
+    notas: `venta_id:${v.id}`
 }).select();
                     pushToast('💰 Abono registrado'); 
                 } else { 
@@ -683,9 +737,123 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                     loadData();
                 }
             };
+            const addPedido = async (e) => {
+    e.preventDefault();
+    const payload = {
+        fecha: new Date(pedidoForm.fecha).toISOString(),
+        cliente_id: parseInt(pedidoForm.cliente_id),
+        cantidad: parseInt(pedidoForm.cantidad),
+        tipo_cantidad: pedidoForm.tipo_cantidad,
+        notas: pedidoForm.notas || null,
+        procesado: false
+    };
+    const { error } = await supabaseClient.from('pedidos_programados').insert(payload).select();
+    if(error) {
+        console.error('ERROR PEDIDO:', error);
+        pushToast('Error: ' + error.message, 'error');
+    } else {
+        pushToast('✅ Pedido agregado');
+        setPedidoForm({fecha:'',cliente_id:'',cantidad:'',tipo_cantidad:'Unidades',notas:''});
+        loadData();
+    }
+};
+
+const deletePedido = async (id) => {
+    if(!confirm('¿Eliminar pedido?')) return;
+    const { error } = await supabaseClient.from('pedidos_programados').delete().eq('id', id);
+    if(error) {
+        console.error('ERROR DELETE PEDIDO:', error);
+        pushToast('Error', 'error');
+    } else {
+        pushToast('Pedido eliminado', 'error');
+        loadData();
+    }
+};
+
+const procesarPedidosFecha = async (fecha) => {
+    if(!confirm(`¿Convertir todos los pedidos del ${fecha} en ventas?`)) return;
+    
+    const pedidosFecha = pedidosProgramados.filter(p => 
+        p.fecha && p.fecha.slice(0,10) === fecha && !p.procesado
+    );
+    
+    if(pedidosFecha.length === 0) {
+        pushToast('No hay pedidos para procesar', 'warning');
+        return;
+    }
+    
+    try {
+        for(const pedido of pedidosFecha) {
+            const precioUnitario = pedido.tipo_cantidad === 'Unidades' ? 600 : 6000;
+            const total = pedido.cantidad * precioUnitario;
+            
+            // Crear venta
+            const ventaPayload = {
+                cliente_id: pedido.cliente_id,
+                cantidad: pedido.cantidad,
+                tipo_cantidad: pedido.tipo_cantidad,
+                precio_unitario: precioUnitario,
+                total: total,
+                estado_pago: 'Pendiente',
+                fecha: new Date(pedido.fecha).toISOString(),
+                abono: 0,
+                notas: pedido.notas ? `[Pedido programado] ${pedido.notas}` : '[Pedido programado]',
+                usuario_id: user?.id
+            };
+            
+            await supabaseClient.from('ventas').insert(ventaPayload).select();
+            
+            // Marcar pedido como procesado
+            await supabaseClient.from('pedidos_programados').update({procesado: true}).eq('id', pedido.id);
+        }
+        
+        pushToast(`✅ ${pedidosFecha.length} pedido(s) convertidos en ventas`);
+        loadData();
+    } catch(err) {
+        console.error('Error procesando pedidos:', err);
+        pushToast('Error al procesar pedidos', 'error');
+    }
+};
+
+const limpiarListaFecha = async (fecha) => {
+    if(!confirm(`¿Eliminar TODOS los pedidos del ${fecha}?`)) return;
+    
+    const pedidosFecha = pedidosProgramados.filter(p => 
+        p.fecha && p.fecha.slice(0,10) === fecha
+    );
+    
+    try {
+        for(const pedido of pedidosFecha) {
+            await supabaseClient.from('pedidos_programados').delete().eq('id', pedido.id);
+        }
+        pushToast(`✅ Lista del ${fecha} eliminada`);
+        setFechaSeleccionadaPedidos('');
+        loadData();
+    } catch(err) {
+        console.error('Error:', err);
+        pushToast('Error al limpiar lista', 'error');
+    }
+};
+const abrirPerfilCliente = (cliente) => {
+    setClienteSeleccionado(cliente);
+    setMostrarPerfilCliente(true);
+};
 
             const clienteDisplay = (id)=>{ const c = clientes.find(x=>x.id===parseInt(id)); return c?.nombre||'Cliente'; };
-            const ventasFiltradas = ventas.filter(v=>{ if(filterDate){ if(!v.fecha) return false; if(v.fecha.slice(0,10)!==filterDate) return false; } if(filterEstado==='Pagadas') return v.estado_pago==='Pagado'; if(filterEstado==='Pendientes') return v.estado_pago==='Pendiente'; return true; });
+            const ventasFiltradas = ventas.filter(v=>{ 
+    if(filterDate){ 
+        if(!v.fecha) return false; 
+        if(v.fecha.slice(0,10)!==filterDate) return false; 
+    } 
+    if(filterEstado==='Pagadas') return v.estado_pago==='Pagado'; 
+    if(filterEstado==='Pendientes') return v.estado_pago==='Pendiente'; 
+    return true; 
+}).sort((a, b) => {
+    if(ordenAlfabetico) {
+        return (a.clientes?.nombre || '').localeCompare(b.clientes?.nombre || '', 'es', { sensitivity: 'base' });
+    }
+    return 0;
+});
 
             const calcularResumen = () => {
                 const desde = resDesde ? new Date(resDesde) : new Date('2000-01-01');
@@ -713,19 +881,26 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
             if(!user) return <LoginPage onLogin={setUser} />;
 
             return (
-                <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+                    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
                     <div className="bg-gradient-to-r from-amber-700 via-orange-600 to-yellow-600 text-white p-4 shadow-2xl sticky top-0 z-20">
                         <div className="max-w-7xl mx-auto flex justify-between items-center">
                             <div className="flex items-center gap-4">
                                 <div className="bg-white/20 backdrop-blur-sm p-3 rounded-full shadow-lg pulse-hover">
-                                    <span className="text-4xl">🔥</span>
+                                    <span className="text-4xl">🫓</span>
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl md:text-3xl font-bold">Arepas al Fuego 🌽</h1>
-                                    <p className="text-amber-100 text-sm">{user?.email}</p>
+                                    <h1 className="text-2xl md:text-3xl font-bold">Arepas al Carbon 🌽🫓</h1>
+                                    <p className="text-amber-100 text-sm">Aqui to`cuadra... menos la dieta  😂   Facturamos en brasa, compae </p>
                                 </div>
                             </div>
-                            <button onClick={handleLogout} className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm">🚪 Salir</button>
+                          <div className="flex gap-3">
+    <button 
+        onClick={() => setDarkMode(!darkMode)} 
+        className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm">
+        {darkMode ? '🔥 Calentá la arepa, ve' : '☠️ Ya, que huele a quemao'}
+    </button>
+    <button onClick={handleLogout} className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm">🚪 Salir</button>
+</div>
                         </div>
                     </div>
 
@@ -735,6 +910,7 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                             {id:'clientes',label:'Clientes',icon:'👥'},
                             {id:'ventas',label:'Ventas',icon:'🛒'},
                             {id:'historial',label:'Historial Compras',icon:'📋'},
+                            {id:'pedidos',label:'Pedidos Programados',icon:'📅'},
                             {id:'contabilidad',label:'Contabilidad',icon:'💰'},
                             {id:'resumen',label:'Resumen',icon:'📈'}
                         ].map(tab => (
@@ -744,7 +920,7 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                         ))}
                     </div>
 
-                    <div className="max-w-7xl mx-auto p-4 md:p-6">
+                    <div className={`max-w-7xl mx-auto p-4 md:p-6 ${darkMode ? 'text-white' : ''}`}>
                         {activeTab==='dashboard' && (
                             <div className="space-y-6 fade-in">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -784,31 +960,31 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     <div className="bg-white p-6 rounded-2xl shadow-xl border-l-8 border-orange-500">
-                                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><span>📊</span> Resumen de Ventas</h3>
+                                       <h3 className={`text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}><span>📊</span> Resumen de Ventas</h3>
                                         <div className="space-y-3">
                                             <div className="flex justify-between p-4 bg-orange-50 rounded-xl">
-                                                <span className="font-medium">Total Ventas</span>
+                                           <span className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-900'}`}>Total Ventas</span>
                                                 <span className="font-bold text-orange-600">{formatCOP(ventas.reduce((s,v)=>s+(parseFloat(v.total)||0),0))}</span>
                                             </div>
                                             <div className="flex justify-between p-4 bg-green-50 rounded-xl">
-                                                <span className="font-medium">Pagadas</span>
+                                               <span className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-900'}`}>Pagadas</span>
                                                 <span className="font-bold text-green-600">{formatCOP(ventas.filter(v=>v.estado_pago==='Pagado').reduce((s,v)=>s+(parseFloat(v.total)||0),0))}</span>
                                             </div>
                                             <div className="flex justify-between p-4 bg-red-50 rounded-xl">
-                                                <span className="font-medium">Pendientes</span>
+                                                    <span className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-900'}`}>Pendientes</span>
                                                 <span className="font-bold text-red-600">{formatCOP(ventasPendientes)}</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="bg-white p-6 rounded-2xl shadow-xl border-l-8 border-blue-500">
-                                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><span>⏳</span> Pagos Pendientes</h3>
+                                      <h3 className={`text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}><span>⏳</span> Pagos Pendientes</h3>
                                         <div className="space-y-2 max-h-64 overflow-y-auto">
                                             {ventas.filter(v=>v.estado_pago==='Pendiente').slice(0,6).map(v=>(
                                                 <div key={v.id} className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl hover:bg-yellow-100 transition">
                                                     <div>
-                                                        <p className="font-medium text-gray-800">{v.clientes?.nombre}</p>
-                                                        <p className="text-xs text-gray-500">{v.cantidad} {v.tipo_cantidad}</p>
+                                                       <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>{v.clientes?.nombre}</p>
+                                                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{v.cantidad} {v.tipo_cantidad}</p>
                                                     </div>
                                                     <span className="font-bold text-red-600">{formatCOP((parseFloat(v.total)||0)-(parseFloat(v.abono)||0))}</span>
                                                 </div>
@@ -822,7 +998,7 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
 
                         {activeTab==='clientes' && (
                             <div className="space-y-6 fade-in">
-                                <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-green-500">
+                              <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-green-500`}>
                                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>➕</span> Agregar Cliente</h2>
                                     <form onSubmit={addCliente} className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <input value={clienteForm.nombre} onChange={(e)=>setClienteForm({...clienteForm,nombre:e.target.value})} placeholder="Nombre completo *" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" required />
@@ -847,24 +1023,39 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                                     </form>
                                 </div>
 
-                                <div className="bg-white p-8 rounded-2xl shadow-xl">
-                                    <h2 className="text-2xl font-bold mb-6">Lista de Clientes ({clientes.filter(c=>c.activo!==false).length})</h2>
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl`}>
+                                  <div className="flex justify-between items-center mb-6">
+    <h2 className="text-2xl font-bold">Lista de Clientes ({clientes.filter(c=>c.activo!==false).length})</h2>
+    <button 
+        onClick={() => setOrdenAlfabeticoClientes(!ordenAlfabeticoClientes)}
+        className={`px-4 py-2 rounded-lg transition font-medium ${ordenAlfabeticoClientes ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
+        🔤 {ordenAlfabeticoClientes ? 'Orden original' : 'Ordenar A-Z'}
+    </button>
+</div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full">
-                                            <thead><tr className="bg-gray-50"><th className="p-4 text-left font-semibold">Nombre</th><th className="p-4 text-left font-semibold">Tipo</th><th className="p-4 text-left font-semibold">Día</th><th className="p-4 text-left font-semibold">Acciones</th></tr></thead>
+                                          <thead><tr className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Nombre</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Tipo</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Día</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Acciones</th></tr></thead>
                                             <tbody>
-                                                {clientes.filter(c=>c.activo!==false).map(c=>(
-                                                    <tr key={c.id} className="border-t hover:bg-gray-50 transition">
-                                                        <td className="p-4 font-medium">{c.nombre}</td>
+                                               {clientes.filter(c=>c.activo!==false).sort((a, b) => {
+    if(ordenAlfabeticoClientes) {
+        return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
+    }
+    return 0;
+}).map(c=>(
+                                                 <tr key={c.id} className={`border-t ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'} transition`}> 
+                                                     <td className={`p-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{c.nombre}</td>
                                                         <td className="p-4">
-                                                            <select value={c.tipo_cliente||'Individual'} onChange={(e)=>updateTipoCliente(c.id,e.target.value)} className="px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                                          <select value={c.tipo_cliente||'Individual'} onChange={(e)=>updateTipoCliente(c.id,e.target.value)} className={`px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900'}`}>
                                                                 <option value="Individual">Individual</option>
                                                                 <option value="Contrato">Contrato</option>
                                                             </select>
                                                         </td>
-                                                        <td className="p-4">{c.dia_entrega||'-'}</td>
+                                                     <td className={`p-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{c.dia_entrega||'-'}</td>
                                                         <td className="p-4">
-                                                            <button onClick={()=>deleteCliente(c.id)} className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium">🗑️ Eliminar</button>
+                                                          <div className="flex gap-2">
+    <button onClick={()=>abrirPerfilCliente(c)} className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium">👤 Ver Perfil</button>
+    <button onClick={()=>deleteCliente(c.id)} className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium">🗑️ Eliminar</button>
+</div>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -875,28 +1066,229 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                             </div>
                         )}
 
-                        {activeTab==='historial' && (
-                            <HistorialCompras 
-                                clientes={clientes} 
-                                ventas={ventas} 
-                                pushToast={pushToast} 
-                                loadData={loadData}
-                                supabaseClient={supabaseClient}
-                                formatCOP={formatCOP}
-                            />
-                        )}
+                            {activeTab==='historial' && (
+    <HistorialCompras 
+        clientes={clientes} 
+        ventas={ventas} 
+        pushToast={pushToast} 
+        loadData={loadData}
+        supabaseClient={supabaseClient}
+        formatCOP={formatCOP}
+        darkMode={darkMode}
+    />
+)}
+                        {activeTab==='pedidos' && (
+    <div className="space-y-6 fade-in">
+        <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-indigo-500`}>
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                <span>📅</span> Programar Pedido
+            </h2>
+            <form onSubmit={addPedido} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <input 
+                        type="date" 
+                        value={pedidoForm.fecha} 
+                        onChange={(e)=>setPedidoForm({...pedidoForm,fecha:e.target.value})} 
+                        className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500" 
+                        required 
+                    />
+                    <select 
+                        value={pedidoForm.cliente_id} 
+                        onChange={(e)=>setPedidoForm({...pedidoForm,cliente_id:e.target.value})} 
+                        className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500" 
+                        required
+                    >
+                        <option value="">Seleccionar Cliente *</option>
+                        {clientes.filter(c=>c.activo!==false).sort((a, b) => 
+                            a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
+                        ).map(c=>(<option key={c.id} value={c.id}>{c.nombre}</option>))}
+                    </select>
+                    <select 
+                        value={pedidoForm.tipo_cantidad} 
+                        onChange={(e)=>setPedidoForm({...pedidoForm,tipo_cantidad:e.target.value})} 
+                        className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="Unidades">🌽 Unidades</option>
+                        <option value="Paquetes">📦 Paquetes</option>
+                    </select>
+                    <input 
+                        type="number" 
+                        min="1" 
+                        value={pedidoForm.cantidad} 
+                        onChange={(e)=>setPedidoForm({...pedidoForm,cantidad:e.target.value})} 
+                        placeholder="Cantidad *" 
+                        className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500" 
+                        required 
+                    />
+                </div>
+                <input 
+                    value={pedidoForm.notas} 
+                    onChange={(e)=>setPedidoForm({...pedidoForm,notas:e.target.value})} 
+                    placeholder="Notas (opcional)" 
+                    className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
+                />
+                <button 
+                    type="submit" 
+                    className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white p-5 rounded-xl font-bold text-lg hover:from-indigo-600 hover:to-indigo-700 transition shadow-lg pulse-hover"
+                >
+                    ✅ Agregar a Lista
+                </button>
+            </form>
+        </div>
+
+        <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl`}>
+            <h2 className="text-2xl font-bold mb-6">📋 Ver Lista por Fecha</h2>
+            <div className="flex gap-4 mb-6">
+                <input 
+                    type="date" 
+                    value={fechaSeleccionadaPedidos} 
+                    onChange={(e)=>setFechaSeleccionadaPedidos(e.target.value)} 
+                    className="flex-1 p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
+                />
+                <button 
+                    onClick={()=>setFechaSeleccionadaPedidos('')} 
+                    className="px-6 py-4 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition"
+                >
+                    🔄 Ver Todas
+                </button>
+            </div>
+
+            {fechaSeleccionadaPedidos && (
+                <div className="mb-6 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-300">
+                    {(()=>{
+                        const pedidosFecha = pedidosProgramados.filter(p => 
+                            p.fecha && p.fecha.slice(0,10) === fechaSeleccionadaPedidos && !p.procesado
+                        );
+                        const totalUnidades = pedidosFecha.reduce((sum, p) => {
+                            if(p.tipo_cantidad === 'Paquetes') return sum + (p.cantidad * 10);
+                            return sum + p.cantidad;
+                        }, 0);
+                        const totalPaquetes = Math.floor(totalUnidades / 10);
+                        const unidadesSueltas = totalUnidades % 10;
+                        
+                        return (
+                            <div>
+                                <h3 className="text-xl font-bold text-indigo-700 mb-4">
+                                    📅 Producción para {fechaSeleccionadaPedidos}
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                    <div className="bg-white p-4 rounded-xl shadow">
+                                        <p className="text-sm text-gray-600">Total Unidades</p>
+                                        <p className="text-3xl font-bold text-blue-600">{totalUnidades}</p>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-xl shadow">
+                                        <p className="text-sm text-gray-600">Paquetes Completos</p>
+                                        <p className="text-3xl font-bold text-purple-600">{totalPaquetes}</p>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-xl shadow">
+                                        <p className="text-sm text-gray-600">Unidades Sueltas</p>
+                                        <p className="text-3xl font-bold text-orange-600">{unidadesSueltas}</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex gap-3">
+                                    <button 
+                                        onClick={()=>procesarPedidosFecha(fechaSeleccionadaPedidos)}
+                                        className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold hover:from-green-600 hover:to-green-700 transition shadow-lg"
+                                        disabled={pedidosFecha.length === 0}
+                                    >
+                                        ✅ Convertir en Ventas ({pedidosFecha.length})
+                                    </button>
+                                    <button 
+                                        onClick={()=>limpiarListaFecha(fechaSeleccionadaPedidos)}
+                                        className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-xl font-bold hover:from-red-600 hover:to-red-700 transition shadow-lg"
+                                    >
+                                        🗑️ Limpiar Lista
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>
+            )}
+
+            <h3 className="text-xl font-bold mb-4">
+                Pedidos Programados ({pedidosProgramados.filter(p=>!p.procesado).length})
+            </h3>
+            <div className="overflow-x-auto">
+                <table className="w-full">
+                    <thead>
+                        <tr className="bg-gray-50">
+                            <th className="p-4 text-left font-semibold">Fecha</th>
+                            <th className="p-4 text-left font-semibold">Cliente</th>
+                            <th className="p-4 text-left font-semibold">Cantidad</th>
+                            <th className="p-4 text-left font-semibold">Estado</th>
+                            <th className="p-4 text-left font-semibold">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {pedidosProgramados
+                            .filter(p => fechaSeleccionadaPedidos ? p.fecha?.slice(0,10) === fechaSeleccionadaPedidos : true)
+                            .map(p => (
+                          <tr key={p.id} className={`border-t ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'} transition ${p.procesado ? 'opacity-50' : ''}`}>
+                                <td className={`p-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                    {p.fecha ? new Date(p.fecha).toLocaleDateString('es-CO') : 'Sin fecha'}
+                                </td>
+                            <td className={`p-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{p.clientes?.nombre || 'N/A'}</td>
+                                <td className="p-4">
+                                    <span className="font-bold">{p.cantidad}</span> {p.tipo_cantidad}
+                                    {p.tipo_cantidad === 'Paquetes' && (
+                                       <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}> ({p.cantidad * 10} unidades)</span>
+                                    )}
+                                </td>
+                                <td className="p-4">
+                                    {p.procesado ? (
+                                        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                                            ✅ Procesado
+                                        </span>
+                                    ) : (
+                                        <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
+                                            ⏳ Pendiente
+                                        </span>
+                                    )}
+                                </td>
+                                <td className="p-4">
+                                    <div className="flex gap-2">
+                                        {!p.procesado && (
+                                            <button 
+                                                onClick={()=>deletePedido(p.id)} 
+                                                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium"
+                                            >
+                                                🗑️ Eliminar
+                                            </button>
+                                        )}
+                                        {p.notas && (
+                                            <button 
+                                                onClick={()=>setNotaModal(p.notas)} 
+                                                className="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition text-sm"
+                                            >
+                                                📝 Ver
+                                            </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+)}
 
                         {activeTab==='ventas' && (
                             <div className="space-y-6 fade-in">
-                                <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-orange-500">
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-orange-500`}>
                                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>🛒</span> Registrar Venta</h2>
                                     <form onSubmit={addVenta} className="space-y-4">
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <select value={ventaForm.cliente_id} onChange={(e)=>setVentaForm({...ventaForm,cliente_id:e.target.value})} required className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                                                <option value="">Seleccionar Cliente *</option>
-                                                {clientes.filter(c=>c.activo!==false).map(c=>(<option key={c.id} value={c.id}>{c.nombre} ({c.tipo_cliente})</option>))}
+                                          <select value={ventaForm.cliente_id} onChange={(e)=>setVentaForm({...ventaForm,cliente_id:e.target.value})} required className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
+                                            <option value="" className={darkMode ? 'bg-gray-700 text-white' : ''}>Seleccionar Cliente *</option>
+                                            {clientes.filter(c=>c.activo!==false).sort((a, b) => 
+                                                 a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
+                                                    ).map(c=>(<option key={c.id} value={c.id} className={darkMode ? 'bg-gray-700 text-white' : ''}>{c.nombre} ({c.tipo_cliente})</option>))}
                                             </select>
-                                            <select value={ventaForm.tipo_cantidad} onChange={(e)=>setVentaForm({...ventaForm,tipo_cantidad:e.target.value,cantidad:'',total:''})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                           <select value={ventaForm.tipo_cantidad} onChange={(e)=>setVentaForm({...ventaForm,tipo_cantidad:e.target.value,cantidad:'',total:''})} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
                                                 <option value="Unidades">🌽 Unidades ($600 c/u)</option>
                                                 <option value="Paquetes">📦 Paquetes ($6,000 c/u)</option>
                                             </select>
@@ -918,7 +1310,7 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <input type="number" placeholder="Total *" value={ventaForm.total} onChange={(e)=>setVentaForm({...ventaForm,total:e.target.value})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" required />
                                             <input type="number" placeholder="Abono (opcional)" value={ventaForm.abono} onChange={(e)=>setVentaForm({...ventaForm,abono:e.target.value})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
-                                            <select value={ventaForm.estado_pago} onChange={(e)=>setVentaForm({...ventaForm,estado_pago:e.target.value})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                          <select value={ventaForm.estado_pago} onChange={(e)=>setVentaForm({...ventaForm,estado_pago:e.target.value})} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
                                                 <option value="Pendiente">⏳ Pendiente</option>
                                                 <option value="Pagado">✅ Pagado</option>
                                             </select>
@@ -926,7 +1318,7 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <input value={ventaForm.semana} onChange={(e)=>setVentaForm({...ventaForm,semana:e.target.value})} placeholder="Semana (ej: Semana 42)" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
-                                            <input type="date" value={ventaForm.fecha} onChange={(e)=>setVentaForm({...ventaForm,fecha:e.target.value})} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                          <input type="date" value={ventaForm.fecha} onChange={(e)=>setVentaForm({...ventaForm,fecha:e.target.value})} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
                                             <input value={ventaForm.notas} onChange={(e)=>setVentaForm({...ventaForm,notas:e.target.value})} placeholder="Notas" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
                                         </div>
 
@@ -934,11 +1326,11 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                                     </form>
                                 </div>
 
-                                <div className="bg-white p-8 rounded-2xl shadow-xl">
+                               <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-indigo-500`}>
                                     <h2 className="text-2xl font-bold mb-6">Filtros y Búsqueda</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                        <input type="date" value={filterDate} onChange={(e)=>setFilterDate(e.target.value)} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" />
-                                        <select value={filterEstado} onChange={(e)=>setFilterEstado(e.target.value)} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500">
+                                       <input type="date" value={filterDate} onChange={(e)=>setFilterDate(e.target.value)} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                      <select value={filterEstado} onChange={(e)=>setFilterEstado(e.target.value)} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
                                             <option value="Todos">Todas</option>
                                             <option value="Pagadas">✅ Pagadas</option>
                                             <option value="Pendientes">⏳ Pendientes</option>
@@ -969,18 +1361,66 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                                         </div>
                                     )}
 
-                                    <h3 className="text-xl font-bold mb-4">Historial ({ventasFiltradas.length})</h3>
+                                   <div className="flex justify-between items-center mb-4">
+                                    <div className="flex justify-between items-center mb-4">
+   <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Historial ({ventasFiltradas.length})</h3>
+    <button 
+        onClick={() => setOrdenAlfabetico(!ordenAlfabetico)}
+        className={`px-4 py-2 rounded-lg transition font-medium ${ordenAlfabetico ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
+        🔤 {ordenAlfabetico ? 'Orden por fecha' : 'Ordenar A-Z'}
+    </button>
+</div>
+    <button 
+        onClick={() => {
+            const sorted = [...ventasFiltradas].sort((a, b) => 
+                (a.clientes?.nombre || '').localeCompare(b.clientes?.nombre || '', 'es', { sensitivity: 'base' })
+            );
+            setVentas(sorted);
+        }}
+        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium">
+        🔤 Ordenar A-Z
+    </button>
+</div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full">
-                                            <thead><tr className="bg-gray-50"><th className="p-4 text-left font-semibold">Cliente</th><th className="p-4 text-left font-semibold">Cantidad</th><th className="p-4 text-left font-semibold">Total</th><th className="p-4 text-left font-semibold">Abono</th><th className="p-4 text-left font-semibold">Saldo</th><th className="p-4 text-left font-semibold">Estado</th><th className="p-4 text-left font-semibold">Fecha</th><th className="p-4 text-left font-semibold">Acciones</th></tr></thead>
+                                          <thead><tr className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Cliente</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Cantidad</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Total</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Abono</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Saldo</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Estado</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Fecha</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Acciones</th></tr></thead>
                                             <tbody>
                                                 {ventasFiltradas.map(v=>{
                                                     const total=parseFloat(v.total)||0;
                                                     const abono=parseFloat(v.abono)||0;
                                                     const saldo=total-abono;
-                                                    return (<tr key={v.id} className="border-t hover:bg-gray-50 transition">
-                                                        <td className="p-4 font-medium">{v.clientes?.nombre||'N/A'}</td>
-                                                        <td className="p-4">{v.cantidad} {v.tipo_cantidad}</td>
+                                                   return (<tr key={v.id} className={`border-t ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'} transition`}>
+                                                        <td className={`p-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{v.clientes?.nombre||'N/A'}</td>
+                                                         <td className="p-4">
+    <input 
+        type="number" 
+        defaultValue={v.cantidad} 
+        onBlur={async (e) => {
+            const nuevaCantidad = parseInt(e.target.value);
+            if(nuevaCantidad && nuevaCantidad > 0) {
+                const precioUnitario = parseFloat(v.precio_unitario) || (v.tipo_cantidad === 'Unidades' ? 600 : 6000);
+                const nuevoTotal = nuevaCantidad * precioUnitario;
+                const abonoActual = parseFloat(v.abono) || 0;
+                const nuevoEstado = abonoActual >= nuevoTotal ? 'Pagado' : 'Pendiente';
+                
+                const { error } = await supabaseClient.from('ventas').update({ 
+                    cantidad: nuevaCantidad,
+                    total: nuevoTotal,
+                    estado_pago: nuevoEstado
+                }).eq('id', v.id);
+                
+                if(error) {
+                    pushToast('Error al actualizar', 'error');
+                } else {
+                    pushToast('✅ Cantidad y total actualizados');
+                    loadData();
+                }
+            }
+        }}
+       className={`w-20 p-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}
+    />
+   <span className={`ml-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{v.tipo_cantidad}</span>
+</td>   
                                                         <td className="p-4 font-bold text-green-600">{formatCOP(total)}</td>
                                                         <td className="p-4"><span className={`font-bold ${abono>0?'text-blue-600':'text-gray-400'}`}>{formatCOP(abono)}</span></td>
                                                         <td className="p-4"><span className={`font-bold ${saldo>0?'text-red-600':'text-green-600'}`}>{formatCOP(saldo)}</span></td>
@@ -989,12 +1429,12 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                                                                 {v.estado_pago==='Pagado'?'✅ Pagado':'⏳ Pendiente'}
                                                             </button>
                                                         </td>
-                                                        <td className="p-4"><input type="date" defaultValue={v.fecha?v.fecha.slice(0,10):''} onBlur={(e)=>updateFechaVenta(v.id,e.target.value)} className="p-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500" /></td>
-                                                        <td className="p-4">
+                                                        <td className="p-4"></td>
+                                                        <td className="p-4"><input type="date" defaultValue={v.fecha?v.fecha.slice(0,10):''} onBlur={(e)=>updateFechaVenta(v.id,e.target.value)} className={`p-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
                                                             <div className="flex gap-2 flex-wrap">
                                                                 <button onClick={()=>{const ab=prompt(`Agregar abono (Saldo: ${formatCOP(saldo)}):`);if(!ab||ab==='')return;const monto=parseFloat(ab);if(isNaN(monto)||monto<=0){alert('Ingresa un monto válido');return;}if(monto>saldo){alert('El abono no puede ser mayor al saldo');return;}setPagoVenta(v,'Abono',monto);}} className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium text-sm">💰 Abonar</button>
                                                                 <button onClick={()=>deleteVenta(v.id)} className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium text-sm">🗑️</button>
-                                                                {v.notas&&<span className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs" title={v.notas}>📝</span>}
+                                                                    {v.notas&&<button onClick={()=>setNotaModal(v.notas)} className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs hover:bg-amber-200 transition">📝 Ver</button>}
                                                             </div>
                                                         </td>
                                                     </tr>);
@@ -1009,35 +1449,35 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                         {activeTab==='contabilidad' && (
                             <div className="space-y-6 fade-in">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-green-500">
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-green-500`}>
                                         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>📈</span> Agregar Ingreso</h2>
                                         <form onSubmit={addIngreso} className="space-y-4">
                                             <input value={ingresoForm.concepto} onChange={(e)=>setIngresoForm({...ingresoForm,concepto:e.target.value})} placeholder="Concepto" className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" required />
                                             <input type="number" step="100" value={ingresoForm.monto} onChange={(e)=>setIngresoForm({...ingresoForm,monto:e.target.value})} placeholder="Monto" className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" required />
-                                            <input type="date" value={ingresoForm.fecha} onChange={(e)=>setIngresoForm({...ingresoForm,fecha:e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                                          <input type="date" value={ingresoForm.fecha} onChange={(e)=>setIngresoForm({...ingresoForm,fecha:e.target.value})} className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
                                             <button type="submit" className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold hover:from-green-600 hover:to-green-700 transition shadow-lg pulse-hover">✅ Agregar</button>
                                         </form>
                                     </div>
 
-                                    <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-red-500">
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-red-500`}>
                                         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>📉</span> Agregar Egreso</h2>
                                         <form onSubmit={addEgreso} className="space-y-4">
                                             <input value={egresoForm.concepto} onChange={(e)=>setEgresoForm({...egresoForm,concepto:e.target.value})} placeholder="Concepto" className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" required />
                                             <input type="number" step="100" value={egresoForm.monto} onChange={(e)=>setEgresoForm({...egresoForm,monto:e.target.value})} placeholder="Monto" className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" required />
-                                            <input type="date" value={egresoForm.fecha} onChange={(e)=>setEgresoForm({...egresoForm,fecha:e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                                          <input type="date" value={egresoForm.fecha} onChange={(e)=>setEgresoForm({...egresoForm,fecha:e.target.value})} className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
                                             <button type="submit" className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-xl font-bold hover:from-red-600 hover:to-red-700 transition shadow-lg pulse-hover">✅ Agregar</button>
                                         </form>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="bg-white p-8 rounded-2xl shadow-xl">
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl`}>
                                         <h3 className="text-xl font-bold mb-6 text-green-600 flex items-center gap-2"><span>💵</span> Ingresos ({ingresos.length})</h3>
                                         <div className="space-y-3 max-h-96 overflow-y-auto">
                                             {ingresos.map(ing=>(<div key={ing.id} className="flex justify-between items-center p-4 bg-green-50 rounded-xl hover:bg-green-100 transition border-l-4 border-green-500">
                                                 <div className="flex-1">
-                                                    <p className="font-medium text-gray-800">{ing.concepto}</p>
-                                                    <p className="text-sm text-gray-500">{ing.fecha?new Date(ing.fecha).toLocaleDateString('es-CO'):''}</p>
+                                                 <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>{ing.concepto}</p>
+                                                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{ing.fecha?new Date(ing.fecha).toLocaleDateString('es-CO'):''}</p>
                                                 </div>
                                                 <div className="flex gap-3 items-center">
                                                     <span className="font-bold text-green-600 text-lg">{formatCOP(ing.monto)}</span>
@@ -1048,13 +1488,13 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                                         </div>
                                     </div>
 
-                                    <div className="bg-white p-8 rounded-2xl shadow-xl">
+                                   <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl`}>
                                         <h3 className="text-xl font-bold mb-6 text-red-600 flex items-center gap-2"><span>💸</span> Egresos ({egresos.length})</h3>
                                         <div className="space-y-3 max-h-96 overflow-y-auto">
                                             {egresos.map(egr=>(<div key={egr.id} className="flex justify-between items-center p-4 bg-red-50 rounded-xl hover:bg-red-100 transition border-l-4 border-red-500">
                                                 <div className="flex-1">
-                                                    <p className="font-medium text-gray-800">{egr.concepto}</p>
-                                                    <p className="text-sm text-gray-500">{egr.fecha?new Date(egr.fecha).toLocaleDateString('es-CO'):''}</p>
+                                              <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>{egr.concepto}</p>
+                                                   <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{egr.fecha?new Date(egr.fecha).toLocaleDateString('es-CO'):''}</p>
                                                 </div>
                                                 <div className="flex gap-3 items-center">
                                                     <span className="font-bold text-red-600 text-lg">{formatCOP(egr.monto)}</span>
@@ -1070,16 +1510,16 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
 
                         {activeTab==='resumen' && (
                             <div className="space-y-6 fade-in">
-                                <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-purple-500">
+                          <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-purple-500`}>
                                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>📊</span> Resumen General</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">Desde</label>
-                                            <input type="date" value={resDesde} onChange={(e)=>setResDesde(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500" />
+                                         <input type="date" value={resDesde} onChange={(e)=>setResDesde(e.target.value)} className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">Hasta</label>
-                                            <input type="date" value={resHasta} onChange={(e)=>setResHasta(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500" />
+                                       <input type="date" value={resHasta} onChange={(e)=>setResHasta(e.target.value)} className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
                                         </div>
                                         <div className="flex items-end">
                                             <button onClick={()=>{setResDesde('');setResHasta('');}} className="w-full px-6 py-4 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition">🔄 Limpiar</button>
@@ -1114,7 +1554,7 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                                     </div>
                                 </div>
 
-                                <div className="bg-white p-8 rounded-2xl shadow-xl">
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl`}>
                                     <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><span>📋</span> Detalles del Período</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-300">
@@ -1187,6 +1627,154 @@ if(!ventaId && ingreso.concepto && ingreso.concepto.includes('Venta ID:')) {
                             </div>
                         )}
                     </div>
+                    {notaModal && (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={()=>setNotaModal(null)}>
+        <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-lg w-full" onClick={(e)=>e.stopPropagation()}>
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <span>📝</span> Notas de la venta
+            </h3>
+            <p className="text-gray-700 whitespace-pre-wrap mb-6">{notaModal}</p>
+            <button onClick={()=>setNotaModal(null)} className="w-full bg-amber-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-amber-600 transition">
+                Cerrar
+            </button>
+        </div>
+    </div>
+)}
+{mostrarPerfilCliente && clienteSeleccionado && (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={()=>setMostrarPerfilCliente(false)}>
+        <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto`} onClick={(e)=>e.stopPropagation()}>
+            {(()=>{
+                const ventasCliente = ventas.filter(v => v.cliente_id === clienteSeleccionado.id);
+                const totalVentas = ventasCliente.reduce((s,v)=>s+(parseFloat(v.total)||0),0);
+                const totalAbonado = ventasCliente.reduce((s,v)=>s+(parseFloat(v.abono)||0),0);
+                const saldoPendiente = totalVentas - totalAbonado;
+                const ventasPendientes = ventasCliente.filter(v=>v.estado_pago==='Pendiente');
+                const promedioMensual = ventasCliente.length > 0 ? totalVentas / ventasCliente.length : 0;
+                
+                return (
+                    <>
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h2 className="text-3xl font-bold mb-2">👤 {clienteSeleccionado.nombre}</h2>
+                                <div className="flex gap-2">
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${clienteSeleccionado.tipo_cliente==='Contrato'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}`}>
+                                        {clienteSeleccionado.tipo_cliente}
+                                    </span>
+                                    {clienteSeleccionado.dia_entrega && (
+                                        <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
+                                            📅 {clienteSeleccionado.dia_entrega}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <button onClick={()=>setMostrarPerfilCliente(false)} className="text-3xl hover:text-red-500 transition">×</button>
+                        </div>
+
+                        {/* Información básica */}
+                        <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-6 rounded-xl mb-6`}>
+                            <h3 className="text-lg font-bold mb-3">📋 Información</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {clienteSeleccionado.direccion && (
+                                    <div>
+                                        <p className="text-sm text-gray-500">Dirección</p>
+                                        <p className="font-semibold">{clienteSeleccionado.direccion}</p>
+                                    </div>
+                                )}
+                                {clienteSeleccionado.precio_especial && (
+                                    <div>
+                                        <p className="text-sm text-gray-500">Precio Especial</p>
+                                        <p className="font-semibold text-green-600">{formatCOP(clienteSeleccionado.precio_especial)}</p>
+                                    </div>
+                                )}
+                                {clienteSeleccionado.notas && (
+                                    <div className="md:col-span-2">
+                                        <p className="text-sm text-gray-500">Notas</p>
+                                        <p className="font-semibold">{clienteSeleccionado.notas}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Estadísticas */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 rounded-xl">
+                                <p className="text-sm opacity-80">Total Ventas</p>
+                                <p className="text-2xl font-bold">{ventasCliente.length}</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 rounded-xl">
+                                <p className="text-sm opacity-80">Total Facturado</p>
+                                <p className="text-lg font-bold">{formatCOP(totalVentas)}</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-4 rounded-xl">
+                                <p className="text-sm opacity-80">Abonado</p>
+                                <p className="text-lg font-bold">{formatCOP(totalAbonado)}</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-4 rounded-xl">
+                                <p className="text-sm opacity-80">Saldo</p>
+                                <p className="text-lg font-bold">{formatCOP(saldoPendiente)}</p>
+                            </div>
+                        </div>
+
+                        {/* Ventas pendientes */}
+                        {ventasPendientes.length > 0 && (
+                            <div className={`${darkMode ? 'bg-red-900/30' : 'bg-red-50'} p-6 rounded-xl mb-6 border-2 border-red-300`}>
+                                <h3 className="text-lg font-bold mb-3 text-red-700">⚠️ Pagos Pendientes ({ventasPendientes.length})</h3>
+                                <div className="space-y-2">
+                                    {ventasPendientes.slice(0, 5).map(v => (
+                                        <div key={v.id} className={`${darkMode ? 'bg-gray-700' : 'bg-white'} p-3 rounded-lg flex justify-between items-center`}>
+                                            <div>
+                                                <p className="font-semibold">{v.cantidad} {v.tipo_cantidad}</p>
+                                                <p className="text-sm text-gray-500">{v.fecha ? new Date(v.fecha).toLocaleDateString('es-CO') : 'Sin fecha'}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm text-gray-500">Total: {formatCOP(v.total)}</p>
+                                                <p className="font-bold text-red-600">Debe: {formatCOP((parseFloat(v.total)||0)-(parseFloat(v.abono)||0))}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Historial completo */}
+                        <div>
+                            <h3 className="text-lg font-bold mb-3">📜 Historial de Compras</h3>
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {ventasCliente.length === 0 ? (
+                                    <p className="text-center py-8 text-gray-400">Sin ventas registradas</p>
+                                ) : (
+                                    ventasCliente.map(v => (
+                                        <div key={v.id} className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg hover:shadow-md transition`}>
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="font-semibold">{v.cantidad} {v.tipo_cantidad}</p>
+                                                    <p className="text-sm text-gray-500">
+                                                        {v.fecha ? new Date(v.fecha).toLocaleDateString('es-CO') : 'Sin fecha'}
+                                                        {v.semana && ` • ${v.semana}`}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-lg">{formatCOP(v.total)}</p>
+                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${v.estado_pago==='Pagado'?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>
+                                                        {v.estado_pago}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        <button onClick={()=>setMostrarPerfilCliente(false)} className="w-full mt-6 bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-3 rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition">
+                            Cerrar Perfil
+                        </button>
+                    </>
+                );
+            })()}
+        </div>
+    </div>
+)}
 
                     <Toast toasts={toasts} remove={removeToast} />
                 </div>
