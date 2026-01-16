@@ -1,0 +1,20 @@
+{
+  "name": "Arepas al Carbón - Sistema de Gestión",
+  "short_name": "Arepas",
+  "description": "Sistema de gestión de ventas, clientes y contabilidad",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "Arepas.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"],
+  "screenshots": []
+}
