@@ -3,7 +3,8 @@
 
 <head>
     <meta name="theme-color" content="#f59e0b">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="Arepas.png">
@@ -21,6 +22,7 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
+        
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -170,37 +172,49 @@
         }
 
         /* Mobile optimizations */
-@media (max-width: 768px) {
-    .mobile-hide {
-        display: none;
-    }
+        @media (max-width: 768px) {
+            .mobile-hide {
+                display: none;
+            }
 
-    .mobile-full {
-        width: 100% !important;
-    }
+            .mobile-full {
+                width: 100% !important;
+            }
 
-    .mobile-stack {
-        flex-direction: column;
-    }
-    
-    /* Botones solo iconos en móvil */
-    .btn-text-mobile {
-        font-size: 0;
-    }
-    
-    /* Reducir tamaños */
-    .p-8 { padding: 1rem !important; }
-    .p-6 { padding: 0.75rem !important; }
-    .text-2xl { font-size: 1.25rem !important; }
-    .text-3xl { font-size: 1.5rem !important; }
-    
-    /* Calendario más compacto */
-    .calendar-day {
-        min-height: 60px !important;
-        padding: 0.25rem !important;
-        font-size: 0.75rem !important;
-    }
-}
+            .mobile-stack {
+                flex-direction: column;
+            }
+
+            /* Botones solo iconos en móvil */
+            .btn-text-mobile {
+                font-size: 0;
+            }
+
+            /* Reducir tamaños */
+            .p-8 {
+                padding: 1rem !important;
+            }
+
+            .p-6 {
+                padding: 0.75rem !important;
+            }
+
+            .text-2xl {
+                font-size: 1.25rem !important;
+            }
+
+            .text-3xl {
+                font-size: 1.5rem !important;
+            }
+
+            /* Calendario más compacto */
+            .calendar-day {
+                min-height: 60px !important;
+                padding: 0.25rem !important;
+                font-size: 0.75rem !important;
+            }
+        }
+
         /* Ocultar scrollbar pero mantener funcionalidad */
         .scrollbar-hide::-webkit-scrollbar {
             display: none;
@@ -373,8 +387,8 @@
             );
         }
 
-          function HistorialCompras({ clientes, ventas, pushToast, loadData, supabaseClient, formatCOP, darkMode, enviarWhatsApp }) {
-        const [selectedCliente, setSelectedCliente] = useState(null);
+        function HistorialCompras({ clientes, ventas, pushToast, loadData, supabaseClient, formatCOP, darkMode, enviarWhatsApp }) {
+            const [selectedCliente, setSelectedCliente] = useState(null);
             const [abonoTotal, setAbonoTotal] = useState('');
 
             const calcularDeudaPorCliente = () => {
@@ -600,36 +614,36 @@
                                                     💰 Abonar
                                                 </button>
                                                 <button
-    onClick={async () => {
-        try {
-            // Preparar el mensaje detallado
-            let mensaje = `Hola ${deudaInfo.cliente.nombre}! 🫓🌽\n\n`;
-            mensaje += `Te enviamos el detalle de tu saldo pendiente:\n\n`;
+                                                    onClick={async () => {
+                                                        try {
+                                                            // Preparar el mensaje detallado
+                                                            let mensaje = `Hola ${deudaInfo.cliente.nombre}! 🫓🌽 \n\n`;
+                                                            mensaje += `Te enviamos el detalle de tu saldo pendiente:\n\n`;
 
-            // Agregar detalle por fecha
-            deudaInfo.fechas.forEach(fechaInfo => {
-                mensaje += `📅 *${fechaInfo.fecha}*\n`;
-                fechaInfo.ventas.forEach(v => {
-                    const deuda = (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0);
-                    mensaje += `  • ${v.cantidad} ${v.tipo_cantidad} - Debe: ${formatCOP(deuda)}\n`;
-                });
-                mensaje += `\n`;
-            });
+                                                            // Agregar detalle por fecha
+                                                            deudaInfo.fechas.forEach(fechaInfo => {
+                                                                mensaje += ` 📅 *${fechaInfo.fecha}*\n`;
+                                                                fechaInfo.ventas.forEach(v => {
+                                                                    const deuda = (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0);
+                                                                    mensaje += `  • ${v.cantidad} ${v.tipo_cantidad} - Debe: ${formatCOP(deuda)}\n`;
+                                                                });
+                                                                mensaje += `\n`;
+                                                            });
 
-            mensaje += `💰 *TOTAL ADEUDADO: ${formatCOP(deudaInfo.totalDeuda)}*\n\n`;
-            mensaje += `¿Cuándo podríamos coordinar el pago? Estamos a tu disposición. ¡Gracias! 😊\n\n`;
-            mensaje += `ATT: Arepas al Carbon 🫓🌽`;
+                                                            mensaje += `💰  *TOTAL ADEUDADO: ${formatCOP(deudaInfo.totalDeuda)}*\n\n`;
+                                                            mensaje += `¿Cuándo podríamos coordinar el pago? Estamos a tu disposición. ¡Gracias! 😊 \n\n`;
+                                                            mensaje += `ATT: Arepas al Carbon 🫓🌽 `;
 
-            // Llamar a la función
-            await enviarWhatsApp(deudaInfo.cliente, mensaje);
-        } catch (error) {
-            console.error('Error al enviar WhatsApp:', error);
-            pushToast('Error al abrir WhatsApp', 'error');
-        }
-    }}
-    className="bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-lg font-bold hover:from-green-600 hover:to-green-700 transition">
-    📱 WhatsApp
-</button>
+                                                            // Llamar a la función
+                                                            await enviarWhatsApp(deudaInfo.cliente, mensaje);
+                                                        } catch (error) {
+                                                            console.error('Error al enviar WhatsApp:', error);
+                                                            pushToast('Error al abrir WhatsApp', 'error');
+                                                        }
+                                                    }}
+                                                    className="bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-lg font-bold hover:from-green-600 hover:to-green-700 transition">
+                                                    📱 WhatsApp
+                                                </button>
                                             </div>
                                         )}
                                     </div>
@@ -675,12 +689,15 @@
             const [showCalculadora, setShowCalculadora] = useState(false);
             const [calcUnidades, setCalcUnidades] = useState('');
             const [modoCalculadora, setModoCalculadora] = useState('conversion'); // 'conversion', 'inversa', 'normal'
-const [calcInput1, setCalcInput1] = useState('');
-const [calcInput2, setCalcInput2] = useState('');
-const [calcOperacion, setCalcOperacion] = useState('+');
-const [calcResultado, setCalcResultado] = useState(null);
+            const [calcInput1, setCalcInput1] = useState('');
+            const [calcInput2, setCalcInput2] = useState('');
+            const [calcOperacion, setCalcOperacion] = useState('+');
+            const [calcResultado, setCalcResultado] = useState(null);
             const [isLoading, setIsLoading] = useState(false);
             const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+            const [showMenu, setShowMenu] = useState(false);
+            const [showModal, setShowModal] = useState(false);
+            const [modalConfig, setModalConfig] = useState({ type: 'confirm', title: '', message: '', onConfirm: null, onCancel: null, inputValue: '', placeholder: '' });
             // Estados para calendario
             const [notasCalendario, setNotasCalendario] = useState([]);
             const [mesActual, setMesActual] = useState(new Date());
@@ -713,6 +730,45 @@ const [calcResultado, setCalcResultado] = useState(null);
             const [mostrarHistorial, setMostrarHistorial] = useState(false);
 
             const pushToast = (msg, type = 'success') => { const id = Date.now() + Math.random(); const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'; setToasts(t => [...t, { id, message: msg, type, icon }]); setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 5000); };
+            // Funciones para modales personalizados
+            const showConfirm = (title, message, onConfirm, onCancel) => {
+                setModalConfig({
+                    type: 'confirm',
+                    title,
+                    message,
+                    onConfirm,
+                    onCancel,
+                    inputValue: '',
+                    placeholder: ''
+                });
+                setShowModal(true);
+            };
+
+            const showPrompt = (title, message, placeholder, onConfirm, onCancel) => {
+                setModalConfig({
+                    type: 'prompt',
+                    title,
+                    message,
+                    onConfirm,
+                    onCancel,
+                    inputValue: '',
+                    placeholder
+                });
+                setShowModal(true);
+            };
+
+            const showInfo = (title, message) => {
+                setModalConfig({
+                    type: 'info',
+                    title,
+                    message,
+                    onConfirm: null,
+                    onCancel: null,
+                    inputValue: '',
+                    placeholder: ''
+                });
+                setShowModal(true);
+            };
             // Función para lanzar confeti
             const lanzarConfeti = () => {
                 confetti({
@@ -738,55 +794,80 @@ const [calcResultado, setCalcResultado] = useState(null);
                 }, 400);
             };
             // Función para abrir WhatsApp
-       const enviarWhatsApp = async (cliente, mensaje) => {
-    try {
-        let telefono = cliente.telefono;
+            const enviarWhatsApp = async (cliente, mensaje) => {
+                try {
+                    let telefono = cliente.telefono;
 
-        // Si no hay teléfono, pedir al usuario
-        if (!telefono) {
-            telefono = prompt(`Ingresa el teléfono de ${cliente.nombre} (con código de país, ej: 573001234567):`);
-            if (!telefono) {
-                pushToast('❌ Se canceló el envío', 'error');
-                return;
-            }
+                    // Si no hay teléfono, pedir al usuario
+                    if (!telefono) {
+                        showPrompt(
+                            '📱 Teléfono de WhatsApp',
+                            `Ingresa el teléfono de ${cliente.nombre}`,
+                            '573001234567',
+                            async (tel) => {
+                                if (!tel) {
+                                    pushToast('❌ Se canceló el envío', 'error');
+                                    return;
+                                }
+                                telefono = tel;
 
-            // Guardar el teléfono en el perfil
-            if (confirm('¿Guardar este teléfono en el perfil del cliente?')) {
-                const { error } = await supabaseClient.from('clientes').update({ telefono }).eq('id', cliente.id);
-                if (!error) {
-                    pushToast('✅ Teléfono guardado');
-                    setClientes(prev => prev.map(c => c.id === cliente.id ? { ...c, telefono } : c));
-                } else {
-                    console.error('Error guardando teléfono:', error);
+                                // Guardar el teléfono
+                                showConfirm(
+                                    '💾 Guardar teléfono',
+                                    '¿Deseas guardar este teléfono en el perfil del cliente?',
+                                    async () => {
+                                        const { error } = await supabaseClient.from('clientes').update({ telefono }).eq('id', cliente.id);
+                                        if (!error) {
+                                            pushToast('✅ Teléfono guardado');
+                                            setClientes(prev => prev.map(c => c.id === cliente.id ? { ...c, telefono } : c));
+                                        } else {
+                                            console.error('Error guardando teléfono:', error);
+                                        }
+                                    }
+                                );
+
+                                // Continuar con WhatsApp
+                                telefono = telefono.replace(/[\s\-\(\)]/g, '');
+                                if (!telefono.startsWith('+')) {
+                                    telefono = '+' + telefono;
+                                }
+                                const mensajeEncoded = encodeURIComponent(mensaje);
+                                const url = `https://wa.me/${telefono.replace('+', '')}?text=${mensajeEncoded}`;
+                                window.open(url, '_blank');
+                                pushToast('✅ Abriendo WhatsApp...', 'success');
+                            },
+                            () => {
+                                pushToast('❌ Se canceló el envío', 'error');
+                            }
+                        );
+                        return;
+                    }
+
+                    // Limpiar el número (quitar espacios, guiones, etc.)
+                    telefono = telefono.replace(/[\s\-\(\)]/g, '');
+
+                    // Si no empieza con +, agregarlo
+                    if (!telefono.startsWith('+')) {
+                        telefono = '+' + telefono;
+                    }
+
+                    // Codificar el mensaje para URL
+                    const mensajeEncoded = encodeURIComponent(mensaje);
+
+                    // Crear URL de WhatsApp
+                    const url = `https://wa.me/${telefono.replace('+', '')}?text=${mensajeEncoded}`;
+
+                    console.log('📱 Abriendo WhatsApp con:', url); // Para debug
+
+                    // Abrir WhatsApp
+                    window.open(url, '_blank');
+
+                    pushToast('✅ Abriendo WhatsApp...', 'success');
+                } catch (error) {
+                    console.error('❌ Error en WhatsApp:', error);
+                    pushToast('Error al abrir WhatsApp: ' + error.message, 'error');
                 }
-            }
-        }
-
-        // Limpiar el número (quitar espacios, guiones, etc.)
-        telefono = telefono.replace(/[\s\-\(\)]/g, '');
-        
-        // Si no empieza con +, agregarlo
-        if (!telefono.startsWith('+')) {
-            telefono = '+' + telefono;
-        }
-
-        // Codificar el mensaje para URL
-        const mensajeEncoded = encodeURIComponent(mensaje);
-        
-        // Crear URL de WhatsApp
-        const url = `https://wa.me/${telefono.replace('+', '')}?text=${mensajeEncoded}`;
-        
-        console.log('📱 Abriendo WhatsApp con:', url); // Para debug
-        
-        // Abrir WhatsApp
-        window.open(url, '_blank');
-        
-        pushToast('✅ Abriendo WhatsApp...', 'success');
-    } catch (error) {
-        console.error('❌ Error en WhatsApp:', error);
-        pushToast('Error al abrir WhatsApp: ' + error.message, 'error');
-    }
-};
+            };
 
             // Función para generar reporte PDF
             const generarReportePDF = async () => {
@@ -903,31 +984,40 @@ const [calcResultado, setCalcResultado] = useState(null);
 
                     // Crear libro de Excel
                     const wb = XLSX.utils.book_new();
-
                     // HOJA 1: RESUMEN COMPARATIVO
                     const resumenData = [
-                        ['AREPAS AL CARBÓN - REPORTE FINANCIERO'],
+                        ['🫓 AREPAS AL CARBÓN 🌽'],
+                        ['REPORTE FINANCIERO COMPARATIVO'],
                         [''],
-                        ['Período Actual:', `${desde.toLocaleDateString('es-CO')} - ${hasta.toLocaleDateString('es-CO')}`],
-                        ['Período Anterior:', `${mesAnteriorDesde.toLocaleDateString('es-CO')} - ${mesAnteriorHasta.toLocaleDateString('es-CO')}`],
+                        ['Generado:', new Date().toLocaleString('es-CO')],
                         [''],
-                        ['CONCEPTO', 'PERÍODO ACTUAL', 'PERÍODO ANTERIOR', 'VARIACIÓN', '% CAMBIO'],
-                        ['Total Ventas', totalVentasActual, totalVentasAnterior, totalVentasActual - totalVentasAnterior, `${varVentas}%`],
-                        ['Total Abonado', totalAbonosActual, totalAbonosAnterior, totalAbonosActual - totalAbonosAnterior, ''],
-                        ['Total Pendiente', totalVentasActual - totalAbonosActual, totalVentasAnterior - totalAbonosAnterior, '', ''],
+                        ['═══════════════════════════════════════════════════════════'],
                         [''],
-                        ['Total Ingresos', totalIngresosActual, totalIngresosAnterior, totalIngresosActual - totalIngresosAnterior, `${varIngresos}%`],
-                        ['Total Egresos', totalEgresosActual, totalEgresosAnterior, totalEgresosActual - totalEgresosAnterior, `${varEgresos}%`],
-                        ['Balance Final', balanceActual, balanceAnterior, balanceActual - balanceAnterior, `${varBalance}%`],
+                        ['📊 PERÍODO ACTUAL:', `${desde.toLocaleDateString('es-CO')} al ${hasta.toLocaleDateString('es-CO')}`],
+                        ['📅 PERÍODO ANTERIOR:', `${mesAnteriorDesde.toLocaleDateString('es-CO')} al ${mesAnteriorHasta.toLocaleDateString('es-CO')}`],
                         [''],
-                        ['INDICADORES'],
-                        ['Número de Ventas', ventasActual.length, ventasAnterior.length, '', ''],
-                        ['Ticket Promedio', ventasActual.length > 0 ? totalVentasActual / ventasActual.length : 0, ventasAnterior.length > 0 ? totalVentasAnterior / ventasAnterior.length : 0, '', ''],
-                        ['Tasa de Cobro', totalVentasActual > 0 ? `${(totalAbonosActual / totalVentasActual * 100).toFixed(2)}%` : '0%', totalVentasAnterior > 0 ? `${(totalAbonosAnterior / totalVentasAnterior * 100).toFixed(2)}%` : '0%', '', ''],
+                        ['═══════════════════════════════════════════════════════════'],
+                        [''],
+                        ['CONCEPTO', 'PERÍODO ACTUAL', 'PERÍODO ANTERIOR', 'DIFERENCIA', '% CAMBIO'],
+                        ['───────────────────────────────────────────────────────────'],
                     ];
 
                     const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
                     wsResumen['!cols'] = [{ wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 15 }, { wch: 12 }];
+                    // Estilo para la hoja (ancho de columnas)
+                    wsResumen['!cols'] = [
+                        { wch: 25 }, // Concepto
+                        { wch: 20 }, // Período Actual
+                        { wch: 20 }, // Período Anterior
+                        { wch: 18 }, // Diferencia
+                        { wch: 15 }  // % Cambio
+                    ];
+
+                    // Combinar celdas del título
+                    wsResumen['!merges'] = [
+                        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, // Título principal
+                        { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }  // Subtítulo
+                    ];
                     XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen Comparativo');
 
                     // HOJA 2: DETALLE VENTAS
@@ -1169,7 +1259,11 @@ const [calcResultado, setCalcResultado] = useState(null);
                 setIsLoading(true);
                 try {
                     const { data: cl } = await supabaseClient.from('clientes').select('*').order('created_at', { ascending: false });
-                    const { data: vs } = await supabaseClient.from('ventas').select('*, clientes(nombre)').order('fecha', { ascending: false });
+                    const { data: vs, error: errorVentas } = await supabaseClient.from('ventas').select('*, clientes(nombre)').order('fecha', { ascending: false });
+                    if (errorVentas) {
+                        console.error('Error cargando ventas:', errorVentas);
+                        pushToast('Error al cargar ventas', 'error');
+                    }
                     const { data: ing } = await supabaseClient.from('ingresos').select('*').order('fecha', { ascending: false });
                     const { data: egr } = await supabaseClient.from('egresos').select('*').order('fecha', { ascending: false });
                     const { data: notas } = await supabaseClient.from('notas_calendario').select('*').order('fecha', { ascending: true });
@@ -1243,15 +1337,20 @@ const [calcResultado, setCalcResultado] = useState(null);
             };
 
             const deleteCliente = async (id) => {
-                if (!confirm('¿Eliminar cliente?')) return;
-                const { error } = await supabaseClient.from('clientes').update({ activo: false }).eq('id', id);
-                if (error) {
-                    console.error('ERROR DELETE:', error);
-                    pushToast('Error al eliminar', 'error');
-                } else {
-                    pushToast('Cliente eliminado', 'error');
-                    loadData();
-                }
+                showConfirm(
+                    '🗑️ Eliminar Cliente',
+                    '¿Estás seguro de eliminar este cliente?\n\nEsta acción no se puede deshacer.',
+                    async () => {
+                        const { error } = await supabaseClient.from('clientes').update({ activo: false }).eq('id', id);
+                        if (error) {
+                            console.error('ERROR DELETE:', error);
+                            pushToast('Error al eliminar', 'error');
+                        } else {
+                            pushToast('Cliente eliminado', 'success');
+                            loadData();
+                        }
+                    }
+                );
             };
             useEffect(() => {
                 if (ventaForm.cantidad && ventaForm.tipo_cantidad) {
@@ -1345,15 +1444,20 @@ const [calcResultado, setCalcResultado] = useState(null);
             };
 
             const deleteVenta = async (id) => {
-                if (!confirm('¿Eliminar venta?')) return;
-                const { error } = await supabaseClient.from('ventas').delete().eq('id', id);
-                if (error) {
-                    console.error('ERROR DELETE VENTA:', error);
-                    pushToast('Error al eliminar', 'error');
-                } else {
-                    pushToast('Venta eliminada', 'error');
-                    loadData();
-                }
+                showConfirm(
+                    '🗑️ Eliminar Venta',
+                    '¿Estás seguro de eliminar esta venta?',
+                    async () => {
+                        const { error } = await supabaseClient.from('ventas').delete().eq('id', id);
+                        if (error) {
+                            console.error('ERROR DELETE VENTA:', error);
+                            pushToast('Error al eliminar', 'error');
+                        } else {
+                            pushToast('Venta eliminada', 'success');
+                            loadData();
+                        }
+                    }
+                );
             };
 
             const setPagoVenta = async (v, action, abonoMonto = 0) => {
@@ -1686,38 +1790,38 @@ const [calcResultado, setCalcResultado] = useState(null);
                 return 0;
             });
             const calcularResumen = () => {
-    try {
-        const desde = resDesde ? new Date(resDesde) : (fechaUltimoReinicio ? new Date(fechaUltimoReinicio) : new Date('2000-01-01'));
-        const hasta = resHasta ? new Date(resHasta) : new Date();
-        hasta.setHours(23, 59, 59, 999); // Incluir todo el día
-        
-        const filtrarFecha = (f) => { 
-            if (!f) return false;
-            try {
-                const fecha = new Date(f); 
-                return fecha >= desde && fecha <= hasta; 
-            } catch (err) {
-                console.error('Error procesando fecha:', f, err);
-                return false;
-            }
-        };
-        
-        const ventasFil = ventas.filter(v => v.fecha && filtrarFecha(v.fecha));
-        const ingFil = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha));
-        const egrFil = egresos.filter(e => e.fecha && filtrarFecha(e.fecha));
-        
-        const totalVentas = ventasFil.reduce((s, v) => (s + (parseFloat(v.total) || 0)), 0);
-        const totalAbonos = ventasFil.reduce((s, v) => (s + (parseFloat(v.abono) || 0)), 0);
-        const totalSaldo = totalVentas - totalAbonos;
-        const totalIngresos = ingFil.reduce((s, i) => (s + (parseFloat(i.monto) || 0)), 0);
-        const totalEgresos = egrFil.reduce((s, e) => (s + (parseFloat(e.monto) || 0)), 0);
-        
-        return { totalVentas, totalAbonos, totalSaldo, totalIngresos, totalEgresos };
-    } catch (error) {
-        console.error('Error en calcularResumen:', error);
-        return { totalVentas: 0, totalAbonos: 0, totalSaldo: 0, totalIngresos: 0, totalEgresos: 0 };
-    }
-};
+                try {
+                    const desde = resDesde ? new Date(resDesde) : (fechaUltimoReinicio ? new Date(fechaUltimoReinicio) : new Date('2000-01-01'));
+                    const hasta = resHasta ? new Date(resHasta) : new Date();
+                    hasta.setHours(23, 59, 59, 999); // Incluir todo el día
+
+                    const filtrarFecha = (f) => {
+                        if (!f) return false;
+                        try {
+                            const fecha = new Date(f);
+                            return fecha >= desde && fecha <= hasta;
+                        } catch (err) {
+                            console.error('Error procesando fecha:', f, err);
+                            return false;
+                        }
+                    };
+
+                    const ventasFil = ventas.filter(v => v.fecha && filtrarFecha(v.fecha));
+                    const ingFil = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha));
+                    const egrFil = egresos.filter(e => e.fecha && filtrarFecha(e.fecha));
+
+                    const totalVentas = ventasFil.reduce((s, v) => (s + (parseFloat(v.total) || 0)), 0);
+                    const totalAbonos = ventasFil.reduce((s, v) => (s + (parseFloat(v.abono) || 0)), 0);
+                    const totalSaldo = totalVentas - totalAbonos;
+                    const totalIngresos = ingFil.reduce((s, i) => (s + (parseFloat(i.monto) || 0)), 0);
+                    const totalEgresos = egrFil.reduce((s, e) => (s + (parseFloat(e.monto) || 0)), 0);
+
+                    return { totalVentas, totalAbonos, totalSaldo, totalIngresos, totalEgresos };
+                } catch (error) {
+                    console.error('Error en calcularResumen:', error);
+                    return { totalVentas: 0, totalAbonos: 0, totalSaldo: 0, totalIngresos: 0, totalEgresos: 0 };
+                }
+            };
 
             const resumen = calcularResumen();
             const totalIngresosGlobal = ingresos.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
@@ -1742,7 +1846,7 @@ const [calcResultado, setCalcResultado] = useState(null);
                                     <p className="text-amber-100 text-sm">Aqui to`cuadra... menos la dieta  😂   Facturamos en brasa, compae </p>
                                 </div>
                             </div>
-                            <div className="flex gap-1 md:gap-2 flex-wrap justify-center md:justify-end w-full md:w-auto">
+                            <div className="flex gap-1 md:gap-2 flex-wrap justify-end w-full md:w-auto">
                                 <button
                                     onClick={() => setMostrarModalExcel(true)}
                                     className="hidden md:block bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm text-sm"
@@ -1750,12 +1854,12 @@ const [calcResultado, setCalcResultado] = useState(null);
                                     📊 Excel
                                 </button>
                                 <button
-    onClick={() => setShowCalculadora(true)}
-    className="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm text-sm"
-    title="Calculadora rápida (Alt + K)">
-    <span className="hidden md:inline">🧮 Calculadora</span>
-    <span className="md:hidden">🧮</span>
-</button>
+                                    onClick={() => setShowCalculadora(true)}
+                                    className="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm text-sm"
+                                    title="Calculadora rápida (Alt + K)">
+                                    <span className="hidden md:inline">🧮 Calculadora</span>
+                                    <span className="md:hidden">🧮</span>
+                                </button>
                                 <button
                                     onClick={() => setShowKeyboardShortcuts(true)}
                                     className="hidden md:block bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm text-sm"
@@ -1764,14 +1868,136 @@ const [calcResultado, setCalcResultado] = useState(null);
                                 </button>
                                 <button
                                     onClick={() => setDarkMode(!darkMode)}
-                                    className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm">
-                                    {darkMode ? '🔥 Calentá la arepa, ve' : '☠️ Ya, que huele a quemao'}
+                                    className="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm text-sm">
+                                    <span className="hidden md:inline">{darkMode ? '🔥 Calentá la arepa, ve' : '☠️ Ya, que huele a quemao'}</span>
+                                    <span className="md:hidden">{darkMode ? '🔥' : '☠️'}</span>
                                 </button>
-                                <button onClick={handleLogout} className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm">🚪 Salir</button>
+                                {/* Menú de 3 puntos en móvil */}
+                                <div className="relative md:hidden">
+                                    <button
+                                        onClick={() => setShowMenu(!showMenu)}
+                                        className="bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg font-medium transition backdrop-blur-sm text-xl">
+                                        ⋮
+                                    </button>
+
+                                    {showMenu && (
+                                        <>
+                                            <div
+                                                className="fixed inset-0 z-40"
+                                                onClick={() => setShowMenu(false)}
+                                            />
+                                            <div className={`absolute right-0 top-12 z-50 ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'} border-2 rounded-xl shadow-2xl w-56 py-2 max-h-[80vh] overflow-y-auto`}>
+                                                {/* Secciones principales */}
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('dashboard');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'dashboard' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>📊</span> Inicio
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('clientes');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'clientes' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>👥</span> Clientes
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('ventas');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'ventas' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>🛒</span> Ventas
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('historial');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'historial' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>📋</span> Historial Compras
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('calendario');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'calendario' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>📅</span> Calendario
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('contabilidad');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'contabilidad' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>💰</span> Contabilidad
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('compras');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'compras' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>🛍️</span> Compras
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('resumen');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'resumen' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>📈</span> Resumen
+                                                </button>
+
+                                                {/* Separador */}
+                                                <div className={`my-2 border-t ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}></div>
+
+                                                {/* Opciones adicionales */}
+                                                <button
+                                                    onClick={() => {
+                                                        setMostrarModalExcel(true);
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>📊</span> Generar Excel
+                                                </button>
+
+                                                {/* Separador */}
+                                                <div className={`my-2 border-t ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}></div>
+
+                                                {/* Salir */}
+                                                <button
+                                                    onClick={() => {
+                                                        setShowMenu(false);
+                                                        handleLogout();
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${darkMode ? 'hover:bg-red-700 text-red-300' : 'hover:bg-red-100 text-red-700'}`}>
+                                                    <span>🚪</span> Salir
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
+                            <button
+                                onClick={handleLogout}
+                                className="hidden md:block bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm text-sm">
+                                🚪 Salir
+                            </button>
                         </div>
                     </div>
-                    <div className="flex border-b bg-white shadow-lg sticky top-16 z-10 overflow-x-auto scrollbar-hide">
+                    <div className={`hidden md:flex border-b shadow-lg sticky top-16 z-10 overflow-x-auto scrollbar-hide ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                         {[
                             { id: 'dashboard', label: 'Inicio', icon: '📊' },
                             { id: 'clientes', label: 'Clientes', icon: '👥' },
@@ -1782,7 +2008,7 @@ const [calcResultado, setCalcResultado] = useState(null);
                             { id: 'compras', label: 'Compras', icon: '🛒' },
                             { id: 'resumen', label: 'Resumen', icon: '📈' }
                         ].map(tab => (
-                            <button key={tab.id} onClick={() => { setActiveTab(tab.id); setFilterDate(''); setFilterEstado('Todos'); }} className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all whitespace-nowrap ${activeTab === tab.id ? 'border-b-4 border-orange-600 text-orange-600 bg-orange-50' : 'text-gray-600 hover:text-orange-600 hover:bg-amber-50'}`}>
+                            <button key={tab.id} onClick={() => { setActiveTab(tab.id); setFilterDate(''); setFilterEstado('Todos'); }} className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all whitespace-nowrap ${activeTab === tab.id ? 'border-b-4 border-orange-600 text-orange-600 bg-orange-50' : darkMode ? 'text-gray-300 hover:text-orange-400 hover:bg-gray-700' : 'text-gray-600 hover:text-orange-600 hover:bg-amber-50'}`}>
                                 <span className="text-xl">{tab.icon}</span>{tab.label}
                             </button>
                         ))}
@@ -2161,19 +2387,19 @@ const [calcResultado, setCalcResultado] = useState(null);
                                 </div>
                             </div>
                         )}
-                            {activeTab === 'historial' && (
-    <HistorialCompras
-        clientes={clientes}
-        ventas={ventas}
-        pushToast={pushToast}
-        loadData={loadData}
-        supabaseClient={supabaseClient}
-        formatCOP={formatCOP}
-        darkMode={darkMode}
-        enviarWhatsApp={enviarWhatsApp}
-    />
-)}
-                  
+                        {activeTab === 'historial' && (
+                            <HistorialCompras
+                                clientes={clientes}
+                                ventas={ventas}
+                                pushToast={pushToast}
+                                loadData={loadData}
+                                supabaseClient={supabaseClient}
+                                formatCOP={formatCOP}
+                                darkMode={darkMode}
+                                enviarWhatsApp={enviarWhatsApp}
+                            />
+                        )}
+
 
                         {activeTab === 'calendario' && (
                             <div className="space-y-6 fade-in">
@@ -2183,37 +2409,37 @@ const [calcResultado, setCalcResultado] = useState(null);
                                             <span>📅</span> Calendario de Notas
                                         </h2>
                                         <div className="flex gap-2">
-   <button
-    onClick={() => {
-        const nuevaFecha = new Date(mesActual);
-        nuevaFecha.setMonth(nuevaFecha.getMonth() - 1);
-        setMesActual(nuevaFecha);
-    }}
-    className={`px-2 md:px-4 py-2 rounded-lg font-bold transition text-xs md:text-base ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
-    <span className="hidden md:inline">← Anterior</span>
-    <span className="md:hidden">←</span>
-</button>
-                   <button
-    onClick={() => setMesActual(new Date())}
-    className={`px-2 md:px-4 py-2 rounded-lg font-bold transition text-xs md:text-base ${darkMode ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}>
-    Hoy
-</button>
-   <button
-    onClick={() => {
-        const nuevaFecha = new Date(mesActual);
-        nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
-        setMesActual(nuevaFecha);
-    }}
-    className={`px-2 md:px-4 py-2 rounded-lg font-bold transition text-xs md:text-base ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
-    <span className="hidden md:inline">Siguiente →</span>
-    <span className="md:hidden">→</span>
-</button>
+                                            <button
+                                                onClick={() => {
+                                                    const nuevaFecha = new Date(mesActual);
+                                                    nuevaFecha.setMonth(nuevaFecha.getMonth() - 1);
+                                                    setMesActual(nuevaFecha);
+                                                }}
+                                                className={`px-2 md:px-4 py-2 rounded-lg font-bold transition text-xs md:text-base ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
+                                                <span className="hidden md:inline">← Anterior</span>
+                                                <span className="md:hidden">←</span>
+                                            </button>
+                                            <button
+                                                onClick={() => setMesActual(new Date())}
+                                                className={`px-2 md:px-4 py-2 rounded-lg font-bold transition text-xs md:text-base ${darkMode ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}>
+                                                Hoy
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const nuevaFecha = new Date(mesActual);
+                                                    nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
+                                                    setMesActual(nuevaFecha);
+                                                }}
+                                                className={`px-2 md:px-4 py-2 rounded-lg font-bold transition text-xs md:text-base ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
+                                                <span className="hidden md:inline">Siguiente →</span>
+                                                <span className="md:hidden">→</span>
+                                            </button>
                                         </div>
                                     </div>
 
-                                   <h3 className="text-xl md:text-3xl font-bold text-center mb-4 md:mb-6">
-    {mesActual.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }).toUpperCase()}
-</h3>
+                                    <h3 className="text-xl md:text-3xl font-bold text-center mb-4 md:mb-6">
+                                        {mesActual.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }).toUpperCase()}
+                                    </h3>
 
                                     {/* Encabezados días de la semana */}
                                     <div className="grid grid-cols-7 gap-2 mb-2">
@@ -2261,56 +2487,56 @@ const [calcResultado, setCalcResultado] = useState(null);
                                                             });
                                                             setNotaSeleccionada(null);
                                                         }}
-    className={`p-2 md:p-3 rounded-lg border-2 cursor-pointer transition min-h-[70px] md:min-h-[100px] ${esHoy
-    ? darkMode 
-        ? 'border-orange-400 bg-orange-900 text-white' 
-        : 'border-orange-500 bg-orange-100'
-    : darkMode
-        ? 'bg-gray-700 hover:bg-gray-600 border-gray-600'
-        : 'bg-white hover:bg-gray-50 border-gray-200'
-}`}>
- <div className={`font-bold text-sm md:text-lg mb-1 md:mb-2 ${esHoy ? (darkMode ? 'text-orange-200' : 'text-orange-800') : (darkMode ? 'text-white' : 'text-gray-800')}`}>
-    {dia}
-</div>
+                                                        className={`p-2 md:p-3 rounded-lg border-2 cursor-pointer transition min-h-[70px] md:min-h-[100px] ${esHoy
+                                                            ? darkMode
+                                                                ? 'border-orange-400 bg-orange-900 text-white'
+                                                                : 'border-orange-500 bg-orange-100'
+                                                            : darkMode
+                                                                ? 'bg-gray-700 hover:bg-gray-600 border-gray-600'
+                                                                : 'bg-white hover:bg-gray-50 border-gray-200'
+                                                            }`}>
+                                                        <div className={`font-bold text-sm md:text-lg mb-1 md:mb-2 ${esHoy ? (darkMode ? 'text-orange-200' : 'text-orange-800') : (darkMode ? 'text-white' : 'text-gray-800')}`}>
+                                                            {dia}
+                                                        </div>
                                                         <div className="space-y-1">
                                                             {notasDelDia.map(nota => {
                                                                 // Colores fijos que funcionan con Tailwind
-    const getColorClasses = (color) => {
-    if (darkMode) {
-        switch (color) {
-            case 'blue': return 'bg-blue-800 text-blue-100 hover:bg-blue-700 border-blue-600';
-            case 'green': return 'bg-green-800 text-green-100 hover:bg-green-700 border-green-600';
-            case 'red': return 'bg-red-800 text-red-100 hover:bg-red-700 border-red-600';
-            case 'yellow': return 'bg-yellow-800 text-yellow-100 hover:bg-yellow-700 border-yellow-600';
-            case 'purple': return 'bg-purple-800 text-purple-100 hover:bg-purple-700 border-purple-600';
-            case 'orange': return 'bg-orange-800 text-orange-100 hover:bg-orange-700 border-orange-600';
-            default: return 'bg-gray-600 text-gray-100 hover:bg-gray-500 border-gray-500';
-        }
-    } else {
-        switch (color) {
-            case 'blue': return 'bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-300';
-            case 'green': return 'bg-green-100 text-green-800 hover:bg-green-200 border-green-300';
-            case 'red': return 'bg-red-100 text-red-800 hover:bg-red-200 border-red-300';
-            case 'yellow': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-300';
-            case 'purple': return 'bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-300';
-            case 'orange': return 'bg-orange-100 text-orange-800 hover:bg-orange-200 border-orange-300';
-            default: return 'bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-300';
-        }
-    }
-};
+                                                                const getColorClasses = (color) => {
+                                                                    if (darkMode) {
+                                                                        switch (color) {
+                                                                            case 'blue': return 'bg-blue-800 text-blue-100 hover:bg-blue-700 border-blue-600';
+                                                                            case 'green': return 'bg-green-800 text-green-100 hover:bg-green-700 border-green-600';
+                                                                            case 'red': return 'bg-red-800 text-red-100 hover:bg-red-700 border-red-600';
+                                                                            case 'yellow': return 'bg-yellow-800 text-yellow-100 hover:bg-yellow-700 border-yellow-600';
+                                                                            case 'purple': return 'bg-purple-800 text-purple-100 hover:bg-purple-700 border-purple-600';
+                                                                            case 'orange': return 'bg-orange-800 text-orange-100 hover:bg-orange-700 border-orange-600';
+                                                                            default: return 'bg-gray-600 text-gray-100 hover:bg-gray-500 border-gray-500';
+                                                                        }
+                                                                    } else {
+                                                                        switch (color) {
+                                                                            case 'blue': return 'bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-300';
+                                                                            case 'green': return 'bg-green-100 text-green-800 hover:bg-green-200 border-green-300';
+                                                                            case 'red': return 'bg-red-100 text-red-800 hover:bg-red-200 border-red-300';
+                                                                            case 'yellow': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-300';
+                                                                            case 'purple': return 'bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-300';
+                                                                            case 'orange': return 'bg-orange-100 text-orange-800 hover:bg-orange-200 border-orange-300';
+                                                                            default: return 'bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-300';
+                                                                        }
+                                                                    }
+                                                                };
 
-                                                            return (
-    <div
-        key={nota.id}
-        onClick={(e) => {
-            e.stopPropagation();
-            setNotaSeleccionada(nota);
-            setFormularioNota({ fecha: '', titulo: '', descripcion: '', color: 'blue' });
-        }}
-        className={`text-xs p-1 md:p-2 rounded border-l-2 ${getColorClasses(nota.color)} transition cursor-pointer font-medium shadow-sm truncate`}>
-        📌 {nota.titulo}
-    </div>
-);
+                                                                return (
+                                                                    <div
+                                                                        key={nota.id}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setNotaSeleccionada(nota);
+                                                                            setFormularioNota({ fecha: '', titulo: '', descripcion: '', color: 'blue' });
+                                                                        }}
+                                                                        className={`text-xs p-1 md:p-2 rounded border-l-2 ${getColorClasses(nota.color)} transition cursor-pointer font-medium shadow-sm truncate`}>
+                                                                        📌 {nota.titulo}
+                                                                    </div>
+                                                                );
                                                             })}
                                                         </div>
                                                     </div>
@@ -2333,19 +2559,19 @@ const [calcResultado, setCalcResultado] = useState(null);
                                                     value={formularioNota.titulo}
                                                     onChange={(e) => setFormularioNota({ ...formularioNota, titulo: e.target.value })}
                                                     placeholder="Título de la nota *"
-                                                    className="w-full p-3 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                                                    className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-blue-200'}`}
                                                 />
                                                 <textarea
                                                     value={formularioNota.descripcion}
                                                     onChange={(e) => setFormularioNota({ ...formularioNota, descripcion: e.target.value })}
                                                     placeholder="Descripción (opcional)"
                                                     rows="3"
-                                                    className="w-full p-3 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                                                    className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-blue-200'}`}
                                                 />
                                                 <select
                                                     value={formularioNota.color}
                                                     onChange={(e) => setFormularioNota({ ...formularioNota, color: e.target.value })}
-                                                    className="w-full p-3 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500">
+                                                    className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-blue-200'}`}>
                                                     <option value="blue">🔵 Azul</option>
                                                     <option value="green">🟢 Verde</option>
                                                     <option value="red">🔴 Rojo</option>
@@ -2406,31 +2632,31 @@ const [calcResultado, setCalcResultado] = useState(null);
                                             <div className="space-y-3">
                                                 <div>
                                                     <label className="block text-sm font-semibold mb-2">Título</label>
-                                               <input
-    type="text"
-    defaultValue={notaSeleccionada.titulo}
-    id={`edit-titulo-${notaSeleccionada.id}`}
-    className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-purple-200'}`}
-/>
+                                                    <input
+                                                        type="text"
+                                                        defaultValue={notaSeleccionada.titulo}
+                                                        id={`edit-titulo-${notaSeleccionada.id}`}
+                                                        className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-purple-200'}`}
+                                                    />
                                                 </div>
 
                                                 <div>
                                                     <label className="block text-sm font-semibold mb-2">Descripción</label>
-                                               <textarea
-    defaultValue={notaSeleccionada.descripcion || ''}
-    id={`edit-desc-${notaSeleccionada.id}`}
-    rows="4"
-    className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-purple-200'}`}
-/>
+                                                    <textarea
+                                                        defaultValue={notaSeleccionada.descripcion || ''}
+                                                        id={`edit-desc-${notaSeleccionada.id}`}
+                                                        rows="4"
+                                                        className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-purple-200'}`}
+                                                    />
                                                 </div>
 
                                                 <div>
                                                     <label className="block text-sm font-semibold mb-2">Color</label>
-                                                   <select
-    defaultValue={notaSeleccionada.color}
-    id={`edit-color-${notaSeleccionada.id}`}
-    className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-purple-200'}`}>
-                                                    <option value="blue">🔵 Azul</option>
+                                                    <select
+                                                        defaultValue={notaSeleccionada.color}
+                                                        id={`edit-color-${notaSeleccionada.id}`}
+                                                        className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-purple-200'}`}>
+                                                        <option value="blue">🔵 Azul</option>
                                                         <option value="green">🟢 Verde</option>
                                                         <option value="red">🔴 Rojo</option>
                                                         <option value="yellow">🟡 Amarillo</option>
@@ -2653,14 +2879,47 @@ const [calcResultado, setCalcResultado] = useState(null);
                                                         <td className="p-4"><span className={`font-bold ${abono > 0 ? 'text-blue-600' : 'text-gray-400'}`}>{formatCOP(abono)}</span></td>
                                                         <td className="p-4"><span className={`font-bold ${saldo > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCOP(saldo)}</span></td>
                                                         <td className="p-4">
-                                                            <button onClick={() => { if (v.estado_pago === 'Pagado') { if (confirm('¿Marcar como pendiente?')) setPagoVenta(v, 'Pendiente'); } else { if (confirm('¿Marcar como pagado completamente?')) setPagoVenta(v, 'Pagado'); } }} className={`px-4 py-2 rounded-xl font-medium transition ${v.estado_pago === 'Pagado' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
+                                                            <button onClick={() => {
+                                                                if (v.estado_pago === 'Pagado') {
+                                                                    showConfirm(
+                                                                        '⏳ Marcar como Pendiente',
+                                                                        '¿Cambiar esta venta a pendiente?',
+                                                                        () => setPagoVenta(v, 'Pendiente')
+                                                                    );
+                                                                } else {
+                                                                    showConfirm(
+                                                                        '✅ Marcar como Pagado',
+                                                                        '¿Marcar esta venta como pagada completamente?',
+                                                                        () => setPagoVenta(v, 'Pagado')
+                                                                    );
+                                                                }
+                                                            }} className={`px-4 py-2 rounded-xl font-medium transition ${v.estado_pago === 'Pagado' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
                                                                 {v.estado_pago === 'Pagado' ? '✅ Pagado' : '⏳ Pendiente'}
                                                             </button>
                                                         </td>
                                                         <td className="p-4"></td>
                                                         <td className="p-4"><input type="date" defaultValue={v.fecha ? v.fecha.slice(0, 10) : ''} onBlur={(e) => updateFechaVenta(v.id, e.target.value)} className={`p-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
                                                             <div className="flex gap-2 flex-wrap">
-                                                                <button onClick={() => { const ab = prompt(`Agregar abono (Saldo: ${formatCOP(saldo)}):`); if (!ab || ab === '') return; const monto = parseFloat(ab); if (isNaN(monto) || monto <= 0) { alert('Ingresa un monto válido'); return; } if (monto > saldo) { alert('El abono no puede ser mayor al saldo'); return; } setPagoVenta(v, 'Abono', monto); }} className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium text-sm">💰 Abonar</button>
+                                                                <button onClick={() => {
+                                                                    showPrompt(
+                                                                        '💰 Agregar Abono',
+                                                                        `Saldo pendiente: ${formatCOP(saldo)}\n\nIngresa el monto a abonar:`,
+                                                                        '0',
+                                                                        (ab) => {
+                                                                            if (!ab || ab === '') return;
+                                                                            const monto = parseFloat(ab);
+                                                                            if (isNaN(monto) || monto <= 0) {
+                                                                                pushToast('Ingresa un monto válido', 'error');
+                                                                                return;
+                                                                            }
+                                                                            if (monto > saldo) {
+                                                                                pushToast('El abono no puede ser mayor al saldo', 'error');
+                                                                                return;
+                                                                            }
+                                                                            setPagoVenta(v, 'Abono', monto);
+                                                                        }
+                                                                    );
+                                                                }} className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium text-sm">💰 Abonar</button>
                                                                 <button onClick={() => deleteVenta(v.id)} className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium text-sm">🗑️</button>
                                                                 {v.notas && <button onClick={() => setNotaModal(v.notas)} className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs hover:bg-amber-200 transition">📝 Ver</button>}
                                                             </div>
@@ -2926,84 +3185,84 @@ const [calcResultado, setCalcResultado] = useState(null);
                                                 📚 Ver Historial
                                             </button>
                                             <button
-    onClick={async () => {
-        if (!confirm('⚠️ ¿Estás seguro de reiniciar el resumen?\n\nEsto guardará el resumen actual en el historial y empezará uno nuevo desde hoy.\n\nLos datos NO se eliminarán, solo se guardará un punto de control.')) {
-            return;
-        }
+                                                onClick={async () => {
+                                                    if (!confirm('⚠️ ¿Estás seguro de reiniciar el resumen?\n\nEsto guardará el resumen actual en el historial y empezará uno nuevo desde hoy.\n\nLos datos NO se eliminarán, solo se guardará un punto de control.')) {
+                                                        return;
+                                                    }
 
-        setIsLoading(true);
+                                                    setIsLoading(true);
 
-        try {
-            const fechaInicio = fechaUltimoReinicio || '2000-01-01';
-            const fechaFin = new Date().toISOString().split('T')[0];
+                                                    try {
+                                                        const fechaInicio = fechaUltimoReinicio || '2000-01-01';
+                                                        const fechaFin = new Date().toISOString().split('T')[0];
 
-            // Calcular totales del período
-            const filtrarFecha = (fecha) => {
-                if (!fecha) return false;
-                const f = new Date(fecha);
-                const inicio = new Date(fechaInicio);
-                const fin = new Date(fechaFin);
-                return f >= inicio && f <= fin;
-            };
+                                                        // Calcular totales del período
+                                                        const filtrarFecha = (fecha) => {
+                                                            if (!fecha) return false;
+                                                            const f = new Date(fecha);
+                                                            const inicio = new Date(fechaInicio);
+                                                            const fin = new Date(fechaFin);
+                                                            return f >= inicio && f <= fin;
+                                                        };
 
-            const ventasPeriodo = ventas.filter(v => v.fecha && filtrarFecha(v.fecha));
-            const ingresosPeriodo = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha));
-            const egresosPeriodo = egresos.filter(e => e.fecha && filtrarFecha(e.fecha));
+                                                        const ventasPeriodo = ventas.filter(v => v.fecha && filtrarFecha(v.fecha));
+                                                        const ingresosPeriodo = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha));
+                                                        const egresosPeriodo = egresos.filter(e => e.fecha && filtrarFecha(e.fecha));
 
-            const totalVentas = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
-            const totalAbonos = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0);
-            const totalIngresos = ingresosPeriodo.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
-            const totalEgresos = egresosPeriodo.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
-            const balance = totalIngresos - totalEgresos;
+                                                        const totalVentas = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
+                                                        const totalAbonos = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0);
+                                                        const totalIngresos = ingresosPeriodo.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
+                                                        const totalEgresos = egresosPeriodo.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
+                                                        const balance = totalIngresos - totalEgresos;
 
-            // Guardar en historial
-            const { error: errorHistorial } = await supabaseClient.from('historial_resumenes').insert({
-                fecha_inicio: fechaInicio,
-                fecha_fin: fechaFin,
-                total_ventas: totalVentas,
-                total_abonos: totalAbonos,
-                total_ingresos: totalIngresos,
-                total_egresos: totalEgresos,
-                balance: balance,
-                notas: `Resumen del ${new Date(fechaInicio).toLocaleDateString('es-CO')} al ${new Date(fechaFin).toLocaleDateString('es-CO')}`,
-                usuario_id: user?.id
-            });
+                                                        // Guardar en historial
+                                                        const { error: errorHistorial } = await supabaseClient.from('historial_resumenes').insert({
+                                                            fecha_inicio: fechaInicio,
+                                                            fecha_fin: fechaFin,
+                                                            total_ventas: totalVentas,
+                                                            total_abonos: totalAbonos,
+                                                            total_ingresos: totalIngresos,
+                                                            total_egresos: totalEgresos,
+                                                            balance: balance,
+                                                            notas: `Resumen del ${new Date(fechaInicio).toLocaleDateString('es-CO')} al ${new Date(fechaFin).toLocaleDateString('es-CO')}`,
+                                                            usuario_id: user?.id
+                                                        });
 
-            if (errorHistorial) {
-                pushToast('Error al guardar historial', 'error');
-                console.error('Error:', errorHistorial);
-                return;
-            }
+                                                        if (errorHistorial) {
+                                                            pushToast('Error al guardar historial', 'error');
+                                                            console.error('Error:', errorHistorial);
+                                                            return;
+                                                        }
 
-            // Actualizar fecha de último reinicio
-            const { error: errorConfig } = await supabaseClient
-                .from('configuracion_sistema')
-                .upsert({
-                    clave: 'fecha_ultimo_reinicio',
-                    valor: fechaFin,
-                    usuario_id: user?.id
-                }, { onConflict: 'clave,usuario_id' });
+                                                        // Actualizar fecha de último reinicio
+                                                        const { error: errorConfig } = await supabaseClient
+                                                            .from('configuracion_sistema')
+                                                            .upsert({
+                                                                clave: 'fecha_ultimo_reinicio',
+                                                                valor: fechaFin,
+                                                                usuario_id: user?.id
+                                                            }, { onConflict: 'clave,usuario_id' });
 
-            if (errorConfig) {
-                pushToast('Error al actualizar configuración', 'error');
-                console.error('Error:', errorConfig);
-                return;
-            }
+                                                        if (errorConfig) {
+                                                            pushToast('Error al actualizar configuración', 'error');
+                                                            console.error('Error:', errorConfig);
+                                                            return;
+                                                        }
 
-            pushToast('✅ Resumen guardado en el historial');
-            setFechaUltimoReinicio(fechaFin);
-            await loadData();
+                                                        pushToast('✅ Resumen guardado en el historial');
+                                                        setFechaUltimoReinicio(fechaFin);
+                                                        await loadData();
 
-        } catch (error) {
-            console.error('Error:', error);
-            pushToast('Error al reiniciar resumen', 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    }}
-    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition font-semibold shadow-lg">
-    🔄 Reiniciar Resumen
-</button>
+                                                    } catch (error) {
+                                                        console.error('Error:', error);
+                                                        pushToast('Error al reiniciar resumen', 'error');
+                                                    } finally {
+                                                        setIsLoading(false);
+                                                    }
+                                                }}
+                                                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition font-semibold shadow-lg">
+                                                🔄 Reiniciar Resumen
+                                            </button>
                                         </div>
                                         {/* Modal Historial de Resúmenes */}
                                         {mostrarHistorial && (
@@ -3511,209 +3770,205 @@ const [calcResultado, setCalcResultado] = useState(null);
                         </div>
                     )}
                     {/* Calculadora Rápida */}
-                  {showCalculadora && (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowCalculadora(false)}>
-        <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-8 rounded-2xl shadow-2xl max-w-xs md:max-w-md w-full scale-in max-h-[85vh] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-                    <span>🧮</span> Calculadora
-                </h3>
-                <div className="flex gap-2 items-center">
-                    <button 
-                        onClick={() => {
-                            setShowCalculadora(false);
-                            setMostrarConfigPrecios(true);
-                        }}
-                        className="p-2 bg-purple-100 hover:bg-purple-200 rounded-lg transition text-sm"
-                        title="Configurar precios">
-                        ⚙️
-                    </button>
-                    <button onClick={() => setShowCalculadora(false)} className="text-3xl hover:text-red-500 transition">×</button>
-                </div>
-            </div>
-
-            {/* Selector de modo */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-                <button
-                    onClick={() => {
-                        setModoCalculadora('conversion');
-                        setCalcUnidades('');
-                        setCalcResultado(null);
-                    }}
-                    className={`p-2 md:p-3 rounded-lg font-bold transition text-xs md:text-sm ${
-                        modoCalculadora === 'conversion'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                    }`}>
-                    🌽→📦
-                </button>
-                <button
-                    onClick={() => {
-                        setModoCalculadora('inversa');
-                        setCalcUnidades('');
-                        setCalcResultado(null);
-                    }}
-                    className={`p-2 md:p-3 rounded-lg font-bold transition text-xs md:text-sm ${
-                        modoCalculadora === 'inversa'
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                    }`}>
-                    📦→🌽
-                </button>
-                <button
-                    onClick={() => {
-                        setModoCalculadora('normal');
-                        setCalcInput1('');
-                        setCalcInput2('');
-                        setCalcResultado(null);
-                    }}
-                    className={`p-2 md:p-3 rounded-lg font-bold transition text-xs md:text-sm ${
-                        modoCalculadora === 'normal'
-                            ? 'bg-green-600 text-white'
-                            : 'bg-green-100 text-green-700 hover:bg-green-200'
-                    }`}>
-                    ➕➖✖️➗
-                </button>
-            </div>
-
-            <div className="space-y-4">
-                {/* MODO: Unidades → Paquetes */}
-                {modoCalculadora === 'conversion' && (
-                    <div className={`${darkMode ? 'bg-gray-700' : 'bg-gradient-to-r from-blue-50 to-blue-100'} p-3 md:p-6 rounded-xl border-2 border-blue-300`}>
-                        <h4 className="font-bold text-blue-700 mb-2 text-sm md:text-base">🌽 Unidades → Paquetes</h4>
-                        <input
-                            type="number"
-                            value={calcUnidades}
-                            onChange={(e) => setCalcUnidades(e.target.value)}
-                            placeholder="Ingresa unidades"
-                            className="w-full p-3 md:p-4 border-2 border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-base md:text-lg font-bold text-center mb-3"
-                        />
-                        {calcUnidades && (
-                            <div className="space-y-2 fade-in">
-                                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 md:p-4 rounded-lg`}>
-                                    <p className="text-xs md:text-sm text-gray-600">Paquetes completos</p>
-                                    <p className="text-2xl md:text-3xl font-bold text-purple-600">{Math.floor(parseInt(calcUnidades) / 10)}</p>
+                    {showCalculadora && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowCalculadora(false)}>
+                            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-8 rounded-2xl shadow-2xl max-w-xs md:max-w-md w-full scale-in max-h-[85vh] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+                                        <span>🧮</span> Calculadora
+                                    </h3>
+                                    <div className="flex gap-2 items-center">
+                                        <button
+                                            onClick={() => {
+                                                setShowCalculadora(false);
+                                                setMostrarConfigPrecios(true);
+                                            }}
+                                            className="p-2 bg-purple-100 hover:bg-purple-200 rounded-lg transition text-sm"
+                                            title="Configurar precios">
+                                            ⚙️
+                                        </button>
+                                        <button onClick={() => setShowCalculadora(false)} className="text-3xl hover:text-red-500 transition">×</button>
+                                    </div>
                                 </div>
-                                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 md:p-4 rounded-lg`}>
-                                    <p className="text-xs md:text-sm text-gray-600">Unidades sueltas</p>
-                                    <p className="text-2xl md:text-3xl font-bold text-orange-600">{parseInt(calcUnidades) % 10}</p>
-                                </div>
-                                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 md:p-4 rounded-lg`}>
-                                    <p className="text-xs md:text-sm text-gray-600">Total a cobrar</p>
-                                    <p className="text-xl md:text-2xl font-bold text-green-600">{formatCOP(parseInt(calcUnidades) * precioUnidad)}</p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
 
-                {/* MODO: Paquetes → Unidades */}
-                    {/* MODO: Paquetes → Unidades */}
-{modoCalculadora === 'inversa' && (
-    <div className={`${darkMode ? 'bg-gray-700' : 'bg-gradient-to-r from-purple-50 to-purple-100'} p-3 md:p-6 rounded-xl border-2 border-purple-300`}>
-        <h4 className="font-bold text-purple-700 mb-2 text-sm md:text-base">📦 Paquetes → Unidades</h4>
-        <input
-            type="number"
-            value={calcUnidades}
-            onChange={(e) => setCalcUnidades(e.target.value)}
-            placeholder="Ingresa paquetes"
-            className="w-full p-3 md:p-4 border-2 border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-base md:text-lg font-bold text-center mb-3"
-        />
-        {calcUnidades && (
-            <div className="fade-in space-y-2">
-                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 md:p-4 rounded-lg`}>
-                    <p className="text-xs md:text-sm text-gray-600">Total unidades</p>
-                    <p className="text-2xl md:text-3xl font-bold text-blue-600">{parseInt(calcUnidades) * 10}</p>
-                </div>
-                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 md:p-4 rounded-lg`}>
-                    <p className="text-xs md:text-sm text-gray-600">Total a cobrar</p>
-                    <p className="text-xl md:text-2xl font-bold text-green-600">{formatCOP(parseInt(calcUnidades) * precioPaquete)}</p>
-                </div>
-            </div>
-        )}
-    </div>
-)}
-
-                {/* MODO: Calculadora Normal */}
-                {modoCalculadora === 'normal' && (
-                    <div className={`${darkMode ? 'bg-gray-700' : 'bg-gradient-to-r from-green-50 to-green-100'} p-3 md:p-6 rounded-xl border-2 border-green-300`}>
-                        <h4 className="font-bold text-green-700 mb-3 text-sm md:text-base">🔢 Calculadora</h4>
-                        <div className="space-y-3">
-                            <input
-                                type="number"
-                                value={calcInput1}
-                                onChange={(e) => setCalcInput1(e.target.value)}
-                                placeholder="Primer número"
-                                className="w-full p-3 border-2 border-green-300 rounded-xl focus:ring-2 focus:ring-green-500 text-center font-bold"
-                            />
-                            
-                            <div className="grid grid-cols-4 gap-2">
-                                {['+', '-', '×', '÷'].map(op => (
+                                {/* Selector de modo */}
+                                <div className="grid grid-cols-3 gap-2 mb-4">
                                     <button
-                                        key={op}
-                                        onClick={() => setCalcOperacion(op)}
-                                        className={`p-3 rounded-lg font-bold text-xl transition ${
-                                            calcOperacion === op
-                                                ? 'bg-green-600 text-white'
-                                                : 'bg-white hover:bg-green-100'
-                                        }`}>
-                                        {op}
+                                        onClick={() => {
+                                            setModoCalculadora('conversion');
+                                            setCalcUnidades('');
+                                            setCalcResultado(null);
+                                        }}
+                                        className={`p-2 md:p-3 rounded-lg font-bold transition text-xs md:text-sm ${modoCalculadora === 'conversion'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                            }`}>
+                                        🌽→📦
                                     </button>
-                                ))}
-                            </div>
-
-                            <input
-                                type="number"
-                                value={calcInput2}
-                                onChange={(e) => setCalcInput2(e.target.value)}
-                                placeholder="Segundo número"
-                                className="w-full p-3 border-2 border-green-300 rounded-xl focus:ring-2 focus:ring-green-500 text-center font-bold"
-                            />
-
-                            <button
-                                onClick={() => {
-                                    const n1 = parseFloat(calcInput1) || 0;
-                                    const n2 = parseFloat(calcInput2) || 0;
-                                    let resultado = 0;
-                                    
-                                    switch(calcOperacion) {
-                                        case '+': resultado = n1 + n2; break;
-                                        case '-': resultado = n1 - n2; break;
-                                        case '×': resultado = n1 * n2; break;
-                                        case '÷': resultado = n2 !== 0 ? n1 / n2 : 'Error'; break;
-                                    }
-                                    
-                                    setCalcResultado(resultado);
-                                }}
-                                className="w-full bg-green-600 text-white p-4 rounded-xl font-bold hover:bg-green-700 transition">
-                                = Calcular
-                            </button>
-
-                            {calcResultado !== null && (
-                                <div className="bg-white p-4 rounded-xl border-2 border-green-400 fade-in">
-                                    <p className="text-sm text-gray-600 text-center">Resultado</p>
-                                    <p className="text-3xl font-bold text-green-600 text-center">{calcResultado}</p>
+                                    <button
+                                        onClick={() => {
+                                            setModoCalculadora('inversa');
+                                            setCalcUnidades('');
+                                            setCalcResultado(null);
+                                        }}
+                                        className={`p-2 md:p-3 rounded-lg font-bold transition text-xs md:text-sm ${modoCalculadora === 'inversa'
+                                            ? 'bg-purple-600 text-white'
+                                            : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                            }`}>
+                                        📦→🌽
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setModoCalculadora('normal');
+                                            setCalcInput1('');
+                                            setCalcInput2('');
+                                            setCalcResultado(null);
+                                        }}
+                                        className={`p-2 md:p-3 rounded-lg font-bold transition text-xs md:text-sm ${modoCalculadora === 'normal'
+                                            ? 'bg-green-600 text-white'
+                                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                            }`}>
+                                        ➕➖✖️➗
+                                    </button>
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                )}
 
-                <button
-                    onClick={() => { 
-                        setCalcUnidades(''); 
-                        setCalcInput1('');
-                        setCalcInput2('');
-                        setCalcResultado(null);
-                        setShowCalculadora(false); 
-                    }}
-                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-3 rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition">
-                    Cerrar
-                </button>
-            </div>
-        </div>
-    </div>
-)}
+                                <div className="space-y-4">
+                                    {/* MODO: Unidades → Paquetes */}
+                                    {modoCalculadora === 'conversion' && (
+                                        <div className={`${darkMode ? 'bg-gray-700' : 'bg-gradient-to-r from-blue-50 to-blue-100'} p-3 md:p-6 rounded-xl border-2 border-blue-300`}>
+                                            <h4 className="font-bold text-blue-700 mb-2 text-sm md:text-base">🌽 Unidades → Paquetes</h4>
+                                            <input
+                                                type="number"
+                                                value={calcUnidades}
+                                                onChange={(e) => setCalcUnidades(e.target.value)}
+                                                placeholder="Ingresa unidades"
+                                                className="w-full p-3 md:p-4 border-2 border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-base md:text-lg font-bold text-center mb-3"
+                                            />
+                                            {calcUnidades && (
+                                                <div className="space-y-2 fade-in">
+                                                    <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 md:p-4 rounded-lg`}>
+                                                        <p className="text-xs md:text-sm text-gray-600">Paquetes completos</p>
+                                                        <p className="text-2xl md:text-3xl font-bold text-purple-600">{Math.floor(parseInt(calcUnidades) / 10)}</p>
+                                                    </div>
+                                                    <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 md:p-4 rounded-lg`}>
+                                                        <p className="text-xs md:text-sm text-gray-600">Unidades sueltas</p>
+                                                        <p className="text-2xl md:text-3xl font-bold text-orange-600">{parseInt(calcUnidades) % 10}</p>
+                                                    </div>
+                                                    <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 md:p-4 rounded-lg`}>
+                                                        <p className="text-xs md:text-sm text-gray-600">Total a cobrar</p>
+                                                        <p className="text-xl md:text-2xl font-bold text-green-600">{formatCOP(parseInt(calcUnidades) * precioUnidad)}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* MODO: Paquetes → Unidades */}
+                                    {/* MODO: Paquetes → Unidades */}
+                                    {modoCalculadora === 'inversa' && (
+                                        <div className={`${darkMode ? 'bg-gray-700' : 'bg-gradient-to-r from-purple-50 to-purple-100'} p-3 md:p-6 rounded-xl border-2 border-purple-300`}>
+                                            <h4 className="font-bold text-purple-700 mb-2 text-sm md:text-base">📦 Paquetes → Unidades</h4>
+                                            <input
+                                                type="number"
+                                                value={calcUnidades}
+                                                onChange={(e) => setCalcUnidades(e.target.value)}
+                                                placeholder="Ingresa paquetes"
+                                                className="w-full p-3 md:p-4 border-2 border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-base md:text-lg font-bold text-center mb-3"
+                                            />
+                                            {calcUnidades && (
+                                                <div className="fade-in space-y-2">
+                                                    <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 md:p-4 rounded-lg`}>
+                                                        <p className="text-xs md:text-sm text-gray-600">Total unidades</p>
+                                                        <p className="text-2xl md:text-3xl font-bold text-blue-600">{parseInt(calcUnidades) * 10}</p>
+                                                    </div>
+                                                    <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 md:p-4 rounded-lg`}>
+                                                        <p className="text-xs md:text-sm text-gray-600">Total a cobrar</p>
+                                                        <p className="text-xl md:text-2xl font-bold text-green-600">{formatCOP(parseInt(calcUnidades) * precioPaquete)}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* MODO: Calculadora Normal */}
+                                    {modoCalculadora === 'normal' && (
+                                        <div className={`${darkMode ? 'bg-gray-700' : 'bg-gradient-to-r from-green-50 to-green-100'} p-3 md:p-6 rounded-xl border-2 border-green-300`}>
+                                            <h4 className="font-bold text-green-700 mb-3 text-sm md:text-base">🔢 Calculadora</h4>
+                                            <div className="space-y-3">
+                                                <input
+                                                    type="number"
+                                                    value={calcInput1}
+                                                    onChange={(e) => setCalcInput1(e.target.value)}
+                                                    placeholder="Primer número"
+                                                    className="w-full p-3 border-2 border-green-300 rounded-xl focus:ring-2 focus:ring-green-500 text-center font-bold"
+                                                />
+
+                                                <div className="grid grid-cols-4 gap-2">
+                                                    {['+', '-', '×', '÷'].map(op => (
+                                                        <button
+                                                            key={op}
+                                                            onClick={() => setCalcOperacion(op)}
+                                                            className={`p-3 rounded-lg font-bold text-xl transition ${calcOperacion === op
+                                                                ? 'bg-green-600 text-white'
+                                                                : 'bg-white hover:bg-green-100'
+                                                                }`}>
+                                                            {op}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                <input
+                                                    type="number"
+                                                    value={calcInput2}
+                                                    onChange={(e) => setCalcInput2(e.target.value)}
+                                                    placeholder="Segundo número"
+                                                    className="w-full p-3 border-2 border-green-300 rounded-xl focus:ring-2 focus:ring-green-500 text-center font-bold"
+                                                />
+
+                                                <button
+                                                    onClick={() => {
+                                                        const n1 = parseFloat(calcInput1) || 0;
+                                                        const n2 = parseFloat(calcInput2) || 0;
+                                                        let resultado = 0;
+
+                                                        switch (calcOperacion) {
+                                                            case '+': resultado = n1 + n2; break;
+                                                            case '-': resultado = n1 - n2; break;
+                                                            case '×': resultado = n1 * n2; break;
+                                                            case '÷': resultado = n2 !== 0 ? n1 / n2 : 'Error'; break;
+                                                        }
+
+                                                        setCalcResultado(resultado);
+                                                    }}
+                                                    className="w-full bg-green-600 text-white p-4 rounded-xl font-bold hover:bg-green-700 transition">
+                                                    = Calcular
+                                                </button>
+
+                                                {calcResultado !== null && (
+                                                    <div className="bg-white p-4 rounded-xl border-2 border-green-400 fade-in">
+                                                        <p className="text-sm text-gray-600 text-center">Resultado</p>
+                                                        <p className="text-3xl font-bold text-green-600 text-center">{calcResultado}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={() => {
+                                            setCalcUnidades('');
+                                            setCalcInput1('');
+                                            setCalcInput2('');
+                                            setCalcResultado(null);
+                                            setShowCalculadora(false);
+                                        }}
+                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-3 rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition">
+                                        Cerrar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {/* Modal Configuración de Precios */}
                     {mostrarConfigPrecios && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setMostrarConfigPrecios(false)}>
@@ -3863,6 +4118,67 @@ const [calcResultado, setCalcResultado] = useState(null);
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 10l7-7m0 0l7 7m-7-7v18" />
                         </svg>
                     </button>
+                    {/* Modal personalizado para confirmaciones y prompts */}
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
+                            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-2xl shadow-2xl max-w-md w-full scale-in`} onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                    {modalConfig.type === 'confirm' && <span>⚠️</span>}
+                                    {modalConfig.type === 'prompt' && <span>✏️</span>}
+                                    {modalConfig.type === 'success' && <span>✅</span>}
+                                    {modalConfig.type === 'info' && <span>ℹ️</span>}
+                                    {modalConfig.title}
+                                </h3>
+
+                                <p className={`mb-6 ${darkMode ? 'text-gray-300' : 'text-gray-700'} whitespace-pre-line`}>
+                                    {modalConfig.message}
+                                </p>
+
+                                {modalConfig.type === 'prompt' && (
+                                    <input
+                                        type="text"
+                                        value={modalConfig.inputValue}
+                                        onChange={(e) => setModalConfig({ ...modalConfig, inputValue: e.target.value })}
+                                        placeholder={modalConfig.placeholder || ''}
+                                        className={`w-full p-3 border-2 rounded-xl mb-4 focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                                        autoFocus
+                                    />
+                                )}
+
+                                <div className="flex gap-3">
+                                    {modalConfig.type !== 'info' && (
+                                        <>
+                                            <button
+                                                onClick={() => {
+                                                    if (modalConfig.onConfirm) {
+                                                        modalConfig.onConfirm(modalConfig.type === 'prompt' ? modalConfig.inputValue : true);
+                                                    }
+                                                    setShowModal(false);
+                                                }}
+                                                className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-xl font-bold hover:from-green-600 hover:to-green-700 transition shadow-lg">
+                                                {modalConfig.type === 'confirm' ? '✅ Confirmar' : '💾 Guardar'}
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (modalConfig.onCancel) modalConfig.onCancel();
+                                                    setShowModal(false);
+                                                }}
+                                                className={`flex-1 px-6 py-3 rounded-xl font-bold transition ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
+                                                ❌ Cancelar
+                                            </button>
+                                        </>
+                                    )}
+                                    {modalConfig.type === 'info' && (
+                                        <button
+                                            onClick={() => setShowModal(false)}
+                                            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 transition">
+                                            👍 Entendido
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <Toast toasts={toasts} remove={removeToast} />
                 </div>
             );
