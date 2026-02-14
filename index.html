@@ -12,7 +12,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arepas al Carbon </title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>/script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin ></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1271,13 +1271,13 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                 setIsLoading(true);
                 try {
                     const { data: cl } = await supabaseClient.from('clientes').select('*').order('created_at', { ascending: false });
-                    const { data: vs, error: errorVentas } = await supabaseClient.from('ventas').select('*, clientes(nombre)').order('fecha', { ascending: false });
+                    const { data: vs, error: errorVentas } = await supabaseClient.from('ventas').select('*, clientes(nombre)').eq('archivado', false).order('fecha', { ascending: false });
                     if (errorVentas) {
                         console.error('Error cargando ventas:', errorVentas);
                         pushToast('Error al cargar ventas', 'error');
                     }
-                    const { data: ing } = await supabaseClient.from('ingresos').select('*').order('fecha', { ascending: false });
-                    const { data: egr } = await supabaseClient.from('egresos').select('*').order('fecha', { ascending: false });
+                    const { data: ing } = await supabaseClient.from('ingresos').select('*').eq('archivado', false).order('fecha', { ascending: false });
+                    const { data: egr } = await supabaseClient.from('egresos').select('*').eq('archivado', false).order('fecha', { ascending: false });
                     const { data: notas } = await supabaseClient.from('notas_calendario').select('*').order('fecha', { ascending: true });
                     console.log('📅 Notas cargadas:', notas); // TEMPORAL para debug
                     setNotasCalendario(notas || []);
@@ -2163,78 +2163,123 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                                 </div>
                                             );
                                             // Función para reiniciar resumen
-                                            const reiniciarResumen = async () => {
-                                                if (!confirm('⚠️ ¿Estás seguro de reiniciar el resumen?\n\nEsto guardará el resumen actual en el historial y empezará uno nuevo desde hoy.\n\nLos datos NO se eliminarán, solo se guardará un punto de control.')) {
-                                                    return;
-                                                }
+                                           const reiniciarResumen = async () => {
+    if (!confirm('⚠️ ¿Estás seguro de reiniciar el resumen?\n\nEsto archivará todos los registros actuales y empezará desde cero.\n\nLos datos se guardarán en el historial y podrás consultarlos después.')) {
+        return;
+    }
 
-                                                setIsLoading(true);
+    setIsLoading(true);
 
-                                                try {
-                                                    const fechaInicio = fechaUltimoReinicio || '2000-01-01';
-                                                    const fechaFin = new Date().toISOString().split('T')[0];
+    try {
+        const fechaInicio = fechaUltimoReinicio || '2000-01-01';
+        const fechaFin = new Date().toISOString().split('T')[0];
 
-                                                    // Calcular totales del período
-                                                    const filtrarFecha = (fecha) => {
-                                                        const f = new Date(fecha);
-                                                        const inicio = new Date(fechaInicio);
-                                                        const fin = new Date(fechaFin);
-                                                        return f >= inicio && f <= fin;
-                                                    };
+        // Calcular totales del período
+        const filtrarFecha = (fecha) => {
+            const f = new Date(fecha);
+            const inicio = new Date(fechaInicio);
+            const fin = new Date(fechaFin);
+            return f >= inicio && f <= fin;
+        };
 
-                                                    const ventasPeriodo = ventas.filter(v => v.fecha && filtrarFecha(v.fecha));
-                                                    const ingresosPeriodo = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha));
-                                                    const egresosPeriodo = egresos.filter(e => e.fecha && filtrarFecha(e.fecha));
+        const ventasPeriodo = ventas.filter(v => v.fecha && filtrarFecha(v.fecha) && !v.archivado);
+        const ingresosPeriodo = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha) && !i.archivado);
+        const egresosPeriodo = egresos.filter(e => e.fecha && filtrarFecha(e.fecha) && !e.archivado);
 
-                                                    const totalVentas = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
-                                                    const totalAbonos = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0);
-                                                    const totalIngresos = ingresosPeriodo.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
-                                                    const totalEgresos = egresosPeriodo.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
-                                                    const balance = totalIngresos - totalEgresos;
+        const totalVentas = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
+        const totalAbonos = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0);
+        const totalIngresos = ingresosPeriodo.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
+        const totalEgresos = egresosPeriodo.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
+        const balance = totalIngresos - totalEgresos;
 
-                                                    // Guardar en historial
-                                                    const { error: errorHistorial } = await supabaseClient.from('historial_resumenes').insert({
-                                                        fecha_inicio: fechaInicio,
-                                                        fecha_fin: fechaFin,
-                                                        total_ventas: totalVentas,
-                                                        total_abonos: totalAbonos,
-                                                        total_ingresos: totalIngresos,
-                                                        total_egresos: totalEgresos,
-                                                        balance: balance,
-                                                        notas: `Resumen del ${new Date(fechaInicio).toLocaleDateString('es-CO')} al ${new Date(fechaFin).toLocaleDateString('es-CO')}`,
-                                                        usuario_id: user?.id
-                                                    });
+        // Guardar en historial
+        const { error: errorHistorial } = await supabaseClient.from('historial_resumenes').insert({
+            fecha_inicio: fechaInicio,
+            fecha_fin: fechaFin,
+            total_ventas: totalVentas,
+            total_abonos: totalAbonos,
+            total_ingresos: totalIngresos,
+            total_egresos: totalEgresos,
+            balance: balance,
+            notas: `Resumen del ${new Date(fechaInicio).toLocaleDateString('es-CO')} al ${new Date(fechaFin).toLocaleDateString('es-CO')}`,
+            usuario_id: usuario?.id
+        });
 
-                                                    if (errorHistorial) {
-                                                        pushToast('Error al guardar historial', 'error');
-                                                        return;
-                                                    }
+        if (errorHistorial) {
+            console.error('Error historial:', errorHistorial);
+            pushToast('Error al guardar historial', 'error');
+            return;
+        }
 
-                                                    // Actualizar fecha de último reinicio
-                                                    const { error: errorConfig } = await supabaseClient
-                                                        .from('configuracion_sistema')
-                                                        .upsert({
-                                                            clave: 'fecha_ultimo_reinicio',
-                                                            valor: fechaFin,
-                                                            usuario_id: user?.id
-                                                        }, { onConflict: 'clave,usuario_id' });
+        // ARCHIVAR ventas, ingresos y egresos
+        const ventasIds = ventasPeriodo.map(v => v.id);
+        const ingresosIds = ingresosPeriodo.map(i => i.id);
+        const egresosIds = egresosPeriodo.map(e => e.id);
 
-                                                    if (errorConfig) {
-                                                        pushToast('Error al actualizar configuración', 'error');
-                                                        return;
-                                                    }
+        // Archivar ventas
+        if (ventasIds.length > 0) {
+            const { error: errorVentas } = await supabaseClient
+                .from('ventas')
+                .update({ archivado: true })
+                .in('id', ventasIds);
+            
+            if (errorVentas) {
+                console.error('Error archivando ventas:', errorVentas);
+            }
+        }
 
-                                                    pushToast('✅ Resumen guardado en el historial');
-                                                    setFechaUltimoReinicio(fechaFin);
-                                                    await loadData();
+        // Archivar ingresos
+        if (ingresosIds.length > 0) {
+            const { error: errorIngresos } = await supabaseClient
+                .from('ingresos')
+                .update({ archivado: true })
+                .in('id', ingresosIds);
+            
+            if (errorIngresos) {
+                console.error('Error archivando ingresos:', errorIngresos);
+            }
+        }
 
-                                                } catch (error) {
-                                                    console.error('Error:', error);
-                                                    pushToast('Error al reiniciar resumen', 'error');
-                                                } finally {
-                                                    setIsLoading(false);
-                                                }
-                                            };
+        // Archivar egresos
+        if (egresosIds.length > 0) {
+            const { error: errorEgresos } = await supabaseClient
+                .from('egresos')
+                .update({ archivado: true })
+                .in('id', egresosIds);
+            
+            if (errorEgresos) {
+                console.error('Error archivando egresos:', errorEgresos);
+            }
+        }
+
+        // Actualizar fecha de último reinicio
+        const { error: errorConfig } = await supabaseClient
+            .from('configuracion_sistema')
+            .upsert({
+                clave: 'fecha_ultimo_reinicio',
+                valor: fechaFin,
+                usuario_id: usuario?.id
+            }, { onConflict: 'clave,usuario_id' });
+
+        if (errorConfig) {
+            console.error('Error config:', errorConfig);
+            pushToast('Error al actualizar configuración', 'error');
+            return;
+        }
+
+        pushToast('✅ Resumen reiniciado correctamente', 'success');
+        setFechaUltimoReinicio(fechaFin);
+        
+        // Recargar datos
+        await cargarDatos();
+
+    } catch (error) {
+        console.error('Error:', error);
+        pushToast('❌ Error al reiniciar resumen', 'error');
+    } finally {
+        setIsLoading(false);
+    }
+};
                                         })()}
 
 
