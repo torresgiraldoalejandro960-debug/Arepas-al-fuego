@@ -4,7 +4,7 @@
 <head>
     <meta name="theme-color" content="#f59e0b">
     <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="Arepas.png">
@@ -13,7 +13,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arepas al Carbon </title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin ></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin></script>
@@ -22,7 +22,6 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -275,23 +274,23 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
         const { createClient } = supabase;
-const SUPABASE_URL = 'https://xybyupmrtiyspxlzcaug.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Ynl1cG1ydGl5c3B4bHpjYXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODk3MDYsImV4cCI6MjA3NTQ2NTcwNn0.EHS9tI0-2vllcfdU-W4zeCVWf7csG24CtVmUbmk7s1M'; // mantén tu key completa
+        const SUPABASE_URL = 'https://xybyupmrtiyspxlzcaug.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Ynl1cG1ydGl5c3B4bHpjYXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODk3MDYsImV4cCI6MjA3NTQ2NTcwNn0.EHS9tI0-2vllcfdU-W4zeCVWf7csG24CtVmUbmk7s1M'; // mantén tu key completa
 
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        storage: window.localStorage
-    },
-    global: {
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    }
-});
-const supabase = supabaseClient; // Alias para mantener compatibilidad
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: {
+                autoRefreshToken: true,
+                persistSession: true,
+                detectSessionInUrl: true,
+                storage: window.localStorage
+            },
+            global: {
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            }
+        });
+        const supabase = supabaseClient; // Alias para mantener compatibilidad
         const formatCOP = (amount) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 
         function Toast({ toasts, remove }) {
@@ -551,28 +550,28 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                         ) : (
                             <div className="space-y-6">
                                 {clientesConDeuda.map(deudaInfo => (
-                                    <div key={deudaInfo.cliente.id} className={`border-2 ${darkMode ? 'border-gray-600 bg-gray-750' : 'border-gray-200 bg-white'} rounded-xl p-6 hover:border-orange-300 transition`}>
+                                    <div key={deudaInfo.cliente.id} className={`border-2 ${darkMode ? 'border-gray-600 bg-gray-750' : 'border-gray-200 bg-white'} rounded-xl p-3 md:p-6 hover:border-orange-300 transition`}>
                                         <div className="flex justify-between items-start mb-4">
                                             <div>
-                                                <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>{deudaInfo.cliente.nombre}</h3>
+                                                <h3 className={`text-base md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>{deudaInfo.cliente.nombre}</h3>
                                                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Debe en {deudaInfo.cantidadFechas} fecha(s)</p>
                                             </div>
                                             <div className="text-right">
                                                 <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Total Deuda</p>
-                                                <p className="text-3xl font-bold text-red-600">{formatCOP(deudaInfo.totalDeuda)}</p>
+                                                <p className="text-lg md:text-3xl font-bold text-red-600">{formatCOP(deudaInfo.totalDeuda)}</p>
                                             </div>
                                         </div>
 
                                         <div className="space-y-3 mb-4">
                                             {deudaInfo.fechas.map((fechaInfo, idx) => (
-                                                <div key={idx} className={`${darkMode ? 'bg-red-900/30' : 'bg-red-50'} p-4 rounded-lg border-l-4 border-red-500`}>
+                                                <div key={idx} className={`${darkMode ? 'bg-red-900/30' : 'bg-red-50'} p-2 md:p-4 rounded-lg border-l-4 border-red-500`}>
                                                     <div className="flex justify-between items-center mb-2">
                                                         <span className={`font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>📅 {fechaInfo.fecha}</span>
                                                         <span className="font-bold text-red-600">{formatCOP(fechaInfo.deuda)}</span>
                                                     </div>
                                                     <div className="space-y-2 mt-3">
                                                         {fechaInfo.ventas.map((venta, vIdx) => (
-                                                            <div key={vIdx} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 rounded-lg text-sm`}>
+                                                            <div key={vIdx} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-2 rounded-lg text-xs md:text-sm`}>
                                                                 <div className="flex justify-between items-center">
                                                                     <div>
                                                                         <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Semana: </span>
@@ -690,6 +689,12 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
             const [pedidoForm, setPedidoForm] = useState({ fecha: '', cliente_id: '', cantidad: '', tipo_cantidad: 'Unidades', notas: '' });
             const [fechaSeleccionadaPedidos, setFechaSeleccionadaPedidos] = useState('');
             const [ordenAlfabetico, set0rdenAlfabetico] = useState(false);
+            const [fechasAbiertas, setFechasAbiertas] = useState({});
+            const toggleFecha = (fecha) => setFechasAbiertas(prev => ({ ...prev, [fecha]: !prev[fecha] }));
+            const [ventasSeleccionadas, setVentasSeleccionadas] = useState(new Set());
+            const toggleSeleccion = (id) => setVentasSeleccionadas(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+            const limpiarSeleccion = () => setVentasSeleccionadas(new Set());
+
             const [ordenAlfabeticoClientes, setOrdenAlfabeticoClientes] = useState(false);
             const [darkMode, setDarkMode] = useState(false);
             const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
@@ -1041,7 +1046,7 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
 
                     ventasActual.forEach(v => {
                         ventasDetalle.push([
-                            v.fecha ? new Date(v.fecha).toLocaleDateString('es-CO') : '',
+                            v.fecha ? new Date(v.fecha + 'T00:00:00').toLocaleDateString('es-CO') : '',
                             v.clientes?.nombre || '',
                             v.cantidad,
                             v.tipo_cantidad,
@@ -1454,7 +1459,36 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                     if (submitBtn) submitBtn.classList.remove('shake');
                 }
             };
+            const eliminarSeleccionadas = async () => {
+                if (ventasSeleccionadas.size === 0) return;
+                showConfirm(
+                    '🗑️ Eliminar ventas',
+                    `¿Eliminar las ${ventasSeleccionadas.size} ventas seleccionadas? Esta acción no se puede deshacer.`,
+                    async () => {
+                        for (const id of ventasSeleccionadas) {
+                            await supabaseClient.from('ventas').delete().eq('id', id);
+                        }
+                        pushToast(`🗑️ ${ventasSeleccionadas.size} ventas eliminadas`);
+                        limpiarSeleccion();
+                        loadData();
+                    }
+                );
+            };
 
+            const [modalDuplicar, setModalDuplicar] = useState(null);
+            const [fechaDuplicar, setFechaDuplicar] = useState('');
+            const abrirDuplicar = () => {
+    const seleccionadas = ventas.filter(v => ventasSeleccionadas.has(v.id)).map(v => ({
+        ...v,
+        _editCantidad: v.cantidad,
+        _editTotal: v.total,
+        _editCliente: v.cliente_id,
+        _editNotas: v.notas || '',
+        _editPrecioUnitario: v.precio_unitario || '',
+    }));
+                setFechaDuplicar(new Date().toISOString().slice(0, 10));
+                setModalDuplicar(seleccionadas);
+            };
             const deleteVenta = async (id) => {
                 showConfirm(
                     '🗑️ Eliminar Venta',
@@ -2020,7 +2054,7 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                             { id: 'compras', label: 'Compras', icon: '🛒' },
                             { id: 'resumen', label: 'Resumen', icon: '📈' }
                         ].map(tab => (
-                            <button key={tab.id} onClick={() => { setActiveTab(tab.id); setFilterDate(''); setFilterEstado('Todos'); }} className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all whitespace-nowrap ${activeTab === tab.id ? 'border-b-4 border-orange-600 text-orange-600 bg-orange-50' : darkMode ? 'text-gray-300 hover:text-orange-400 hover:bg-gray-700' : 'text-gray-600 hover:text-orange-600 hover:bg-amber-50'}`}>
+                            <button key={tab.id} onClick={() => { setActiveTab(tab.id); setFilterDate(''); setFilterEstado('Todos'); }} className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all whitespace-nowrap ${activeTab === tab.id ? darkMode ? 'border-b-4 border-orange-500 text-orange-400 bg-gray-700' : 'border-b-4 border-orange-600 text-orange-600 bg-orange-50' : darkMode ? 'text-gray-300 hover:text-orange-400 hover:bg-gray-700' : 'text-gray-600 hover:text-orange-600 hover:bg-amber-50'}`}>
                                 <span className="text-xl">{tab.icon}</span>{tab.label}
                             </button>
                         ))}
@@ -2163,123 +2197,123 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                                 </div>
                                             );
                                             // Función para reiniciar resumen
-                                           const reiniciarResumen = async () => {
-    if (!confirm('⚠️ ¿Estás seguro de reiniciar el resumen?\n\nEsto archivará todos los registros actuales y empezará desde cero.\n\nLos datos se guardarán en el historial y podrás consultarlos después.')) {
-        return;
-    }
+                                            const reiniciarResumen = async () => {
+                                                if (!confirm('⚠️ ¿Estás seguro de reiniciar el resumen?\n\nEsto archivará todos los registros actuales y empezará desde cero.\n\nLos datos se guardarán en el historial y podrás consultarlos después.')) {
+                                                    return;
+                                                }
 
-    setIsLoading(true);
+                                                setIsLoading(true);
 
-    try {
-        const fechaInicio = fechaUltimoReinicio || '2000-01-01';
-        const fechaFin = new Date().toISOString().split('T')[0];
+                                                try {
+                                                    const fechaInicio = fechaUltimoReinicio || '2000-01-01';
+                                                    const fechaFin = new Date().toISOString().split('T')[0];
 
-        // Calcular totales del período
-        const filtrarFecha = (fecha) => {
-            const f = new Date(fecha);
-            const inicio = new Date(fechaInicio);
-            const fin = new Date(fechaFin);
-            return f >= inicio && f <= fin;
-        };
+                                                    // Calcular totales del período
+                                                    const filtrarFecha = (fecha) => {
+                                                        const f = new Date(fecha);
+                                                        const inicio = new Date(fechaInicio);
+                                                        const fin = new Date(fechaFin);
+                                                        return f >= inicio && f <= fin;
+                                                    };
 
-        const ventasPeriodo = ventas.filter(v => v.fecha && filtrarFecha(v.fecha) && !v.archivado);
-        const ingresosPeriodo = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha) && !i.archivado);
-        const egresosPeriodo = egresos.filter(e => e.fecha && filtrarFecha(e.fecha) && !e.archivado);
+                                                    const ventasPeriodo = ventas.filter(v => v.fecha && filtrarFecha(v.fecha) && !v.archivado);
+                                                    const ingresosPeriodo = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha) && !i.archivado);
+                                                    const egresosPeriodo = egresos.filter(e => e.fecha && filtrarFecha(e.fecha) && !e.archivado);
 
-        const totalVentas = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
-        const totalAbonos = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0);
-        const totalIngresos = ingresosPeriodo.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
-        const totalEgresos = egresosPeriodo.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
-        const balance = totalIngresos - totalEgresos;
+                                                    const totalVentas = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
+                                                    const totalAbonos = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0);
+                                                    const totalIngresos = ingresosPeriodo.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
+                                                    const totalEgresos = egresosPeriodo.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
+                                                    const balance = totalIngresos - totalEgresos;
 
-        // Guardar en historial
-        const { error: errorHistorial } = await supabaseClient.from('historial_resumenes').insert({
-            fecha_inicio: fechaInicio,
-            fecha_fin: fechaFin,
-            total_ventas: totalVentas,
-            total_abonos: totalAbonos,
-            total_ingresos: totalIngresos,
-            total_egresos: totalEgresos,
-            balance: balance,
-            notas: `Resumen del ${new Date(fechaInicio).toLocaleDateString('es-CO')} al ${new Date(fechaFin).toLocaleDateString('es-CO')}`,
-            usuario_id: usuario?.id
-        });
+                                                    // Guardar en historial
+                                                    const { error: errorHistorial } = await supabaseClient.from('historial_resumenes').insert({
+                                                        fecha_inicio: fechaInicio,
+                                                        fecha_fin: fechaFin,
+                                                        total_ventas: totalVentas,
+                                                        total_abonos: totalAbonos,
+                                                        total_ingresos: totalIngresos,
+                                                        total_egresos: totalEgresos,
+                                                        balance: balance,
+                                                        notas: `Resumen del ${new Date(fechaInicio).toLocaleDateString('es-CO')} al ${new Date(fechaFin).toLocaleDateString('es-CO')}`,
+                                                        usuario_id: usuario?.id
+                                                    });
 
-        if (errorHistorial) {
-            console.error('Error historial:', errorHistorial);
-            pushToast('Error al guardar historial', 'error');
-            return;
-        }
+                                                    if (errorHistorial) {
+                                                        console.error('Error historial:', errorHistorial);
+                                                        pushToast('Error al guardar historial', 'error');
+                                                        return;
+                                                    }
 
-        // ARCHIVAR ventas, ingresos y egresos
-        const ventasIds = ventasPeriodo.map(v => v.id);
-        const ingresosIds = ingresosPeriodo.map(i => i.id);
-        const egresosIds = egresosPeriodo.map(e => e.id);
+                                                    // ARCHIVAR ventas, ingresos y egresos
+                                                    const ventasIds = ventasPeriodo.map(v => v.id);
+                                                    const ingresosIds = ingresosPeriodo.map(i => i.id);
+                                                    const egresosIds = egresosPeriodo.map(e => e.id);
 
-        // Archivar ventas
-        if (ventasIds.length > 0) {
-            const { error: errorVentas } = await supabaseClient
-                .from('ventas')
-                .update({ archivado: true })
-                .in('id', ventasIds);
-            
-            if (errorVentas) {
-                console.error('Error archivando ventas:', errorVentas);
-            }
-        }
+                                                    // Archivar ventas
+                                                    if (ventasIds.length > 0) {
+                                                        const { error: errorVentas } = await supabaseClient
+                                                            .from('ventas')
+                                                            .update({ archivado: true })
+                                                            .in('id', ventasIds);
 
-        // Archivar ingresos
-        if (ingresosIds.length > 0) {
-            const { error: errorIngresos } = await supabaseClient
-                .from('ingresos')
-                .update({ archivado: true })
-                .in('id', ingresosIds);
-            
-            if (errorIngresos) {
-                console.error('Error archivando ingresos:', errorIngresos);
-            }
-        }
+                                                        if (errorVentas) {
+                                                            console.error('Error archivando ventas:', errorVentas);
+                                                        }
+                                                    }
 
-        // Archivar egresos
-        if (egresosIds.length > 0) {
-            const { error: errorEgresos } = await supabaseClient
-                .from('egresos')
-                .update({ archivado: true })
-                .in('id', egresosIds);
-            
-            if (errorEgresos) {
-                console.error('Error archivando egresos:', errorEgresos);
-            }
-        }
+                                                    // Archivar ingresos
+                                                    if (ingresosIds.length > 0) {
+                                                        const { error: errorIngresos } = await supabaseClient
+                                                            .from('ingresos')
+                                                            .update({ archivado: true })
+                                                            .in('id', ingresosIds);
 
-        // Actualizar fecha de último reinicio
-        const { error: errorConfig } = await supabaseClient
-            .from('configuracion_sistema')
-            .upsert({
-                clave: 'fecha_ultimo_reinicio',
-                valor: fechaFin,
-                usuario_id: usuario?.id
-            }, { onConflict: 'clave,usuario_id' });
+                                                        if (errorIngresos) {
+                                                            console.error('Error archivando ingresos:', errorIngresos);
+                                                        }
+                                                    }
 
-        if (errorConfig) {
-            console.error('Error config:', errorConfig);
-            pushToast('Error al actualizar configuración', 'error');
-            return;
-        }
+                                                    // Archivar egresos
+                                                    if (egresosIds.length > 0) {
+                                                        const { error: errorEgresos } = await supabaseClient
+                                                            .from('egresos')
+                                                            .update({ archivado: true })
+                                                            .in('id', egresosIds);
 
-        pushToast('✅ Resumen reiniciado correctamente', 'success');
-        setFechaUltimoReinicio(fechaFin);
-        
-        // Recargar datos
-        await cargarDatos();
+                                                        if (errorEgresos) {
+                                                            console.error('Error archivando egresos:', errorEgresos);
+                                                        }
+                                                    }
 
-    } catch (error) {
-        console.error('Error:', error);
-        pushToast('❌ Error al reiniciar resumen', 'error');
-    } finally {
-        setIsLoading(false);
-    }
-};
+                                                    // Actualizar fecha de último reinicio
+                                                    const { error: errorConfig } = await supabaseClient
+                                                        .from('configuracion_sistema')
+                                                        .upsert({
+                                                            clave: 'fecha_ultimo_reinicio',
+                                                            valor: fechaFin,
+                                                            usuario_id: usuario?.id
+                                                        }, { onConflict: 'clave,usuario_id' });
+
+                                                    if (errorConfig) {
+                                                        console.error('Error config:', errorConfig);
+                                                        pushToast('Error al actualizar configuración', 'error');
+                                                        return;
+                                                    }
+
+                                                    pushToast('✅ Resumen reiniciado correctamente', 'success');
+                                                    setFechaUltimoReinicio(fechaFin);
+
+                                                    // Recargar datos
+                                                    await cargarDatos();
+
+                                                } catch (error) {
+                                                    console.error('Error:', error);
+                                                    pushToast('❌ Error al reiniciar resumen', 'error');
+                                                } finally {
+                                                    setIsLoading(false);
+                                                }
+                                            };
                                         })()}
 
 
@@ -2398,7 +2432,7 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                                                             // Agrupar deudas por fecha
                                                                             const deudasPorFecha = {};
                                                                             ventasCliente.filter(v => v.estado_pago === 'Pendiente').forEach(v => {
-                                                                                const fecha = v.fecha ? new Date(v.fecha).toLocaleDateString('es-CO') : 'Sin fecha';
+                                                                                const fecha = v.fecha ? new Date(v.fecha + 'T00:00:00').toLocaleDateString('es-CO') : 'Sin fecha';
                                                                                 if (!deudasPorFecha[fecha]) {
                                                                                     deudasPorFecha[fecha] = [];
                                                                                 }
@@ -2460,7 +2494,7 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
 
                         {activeTab === 'calendario' && (
                             <div className="space-y-6 fade-in">
-                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-purple-500`}>
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-3 md:p-8 rounded-2xl shadow-xl border-t-8 border-purple-500`}>
                                     <div className="flex justify-between items-center mb-6">
                                         <h2 className="text-2xl font-bold flex items-center gap-2">
                                             <span>📅</span> Calendario de Notas
@@ -2787,7 +2821,7 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                         <button
                                             type="button"
                                             onClick={() => setMostrarConfigPrecios(true)}
-                                            className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition font-semibold flex items-center gap-2">
+                                            className={`px-4 py-2 rounded-lg transition font-semibold flex items-center gap-2 ${darkMode ? 'bg-purple-900 text-purple-200 hover:bg-purple-800' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}>
                                             ⚙️ Configurar Precios
                                         </button>
                                     </div>
@@ -2803,7 +2837,7 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                                 <option value="Unidades">🌽 Unidades ({formatCOP(precioUnidad)} c/u)</option>
                                                 <option value="Paquetes">📦 Paquetes ({formatCOP(precioPaquete)} c/u)</option>
                                             </select>
-                                            <input type="number" min="1" value={ventaForm.cantidad} onChange={(e) => setVentaForm({ ...ventaForm, cantidad: e.target.value })} placeholder="Cantidad *" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" required />
+                                            <input type="number" min="1" value={ventaForm.cantidad} onChange={(e) => setVentaForm({ ...ventaForm, cantidad: e.target.value })} placeholder="Cantidad *" className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} required />
                                         </div>
 
                                         {ventaForm.precio_sugerido > 0 && (
@@ -2819,8 +2853,8 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                         )}
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <input type="number" placeholder="Total *" value={ventaForm.total} onChange={(e) => setVentaForm({ ...ventaForm, total: e.target.value })} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" required />
-                                            <input type="number" placeholder="Abono (opcional)" value={ventaForm.abono} onChange={(e) => setVentaForm({ ...ventaForm, abono: e.target.value })} className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                            <input type="number" placeholder="Total *" value={ventaForm.total} onChange={(e) => setVentaForm({ ...ventaForm, total: e.target.value })} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} required />
+                                            <input type="number" placeholder="Abono (opcional)" value={ventaForm.abono} onChange={(e) => setVentaForm({ ...ventaForm, abono: e.target.value })} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
                                             <select value={ventaForm.estado_pago} onChange={(e) => setVentaForm({ ...ventaForm, estado_pago: e.target.value })} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
                                                 <option value="Pendiente">⏳ Pendiente</option>
                                                 <option value="Pagado">✅ Pagado</option>
@@ -2828,9 +2862,8 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <input value={ventaForm.semana} onChange={(e) => setVentaForm({ ...ventaForm, semana: e.target.value })} placeholder="Semana (ej: Semana 42)" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
                                             <input type="date" value={ventaForm.fecha} onChange={(e) => setVentaForm({ ...ventaForm, fecha: e.target.value })} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
-                                            <input value={ventaForm.notas} onChange={(e) => setVentaForm({ ...ventaForm, notas: e.target.value })} placeholder="Notas" className="p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                            <input value={ventaForm.notas} onChange={(e) => setVentaForm({ ...ventaForm, notas: e.target.value })} placeholder="Notas" className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
                                         </div>
 
                                         <button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white p-5 rounded-xl font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition shadow-lg pulse-hover">🚀 Registrar Venta</button>
@@ -2846,11 +2879,11 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                             <option value="Pagadas">✅ Pagadas</option>
                                             <option value="Pendientes">⏳ Pendientes</option>
                                         </select>
-                                        <button onClick={() => { setFilterDate(''); setFilterEstado('Todos'); }} className="px-6 py-4 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition">🔄 Limpiar</button>
+                                        <button onClick={() => { setFilterDate(''); setFilterEstado('Todos'); }} className={`px-6 py-4 rounded-xl font-semibold transition ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}>🔄 Limpiar</button>
                                     </div>
 
                                     {filterDate && (
-                                        <div className="mb-6 p-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border-2 border-orange-300">
+                                        <div className={`mb-6 p-6 rounded-xl border-2 border-orange-300 ${darkMode ? 'bg-gray-700' : 'bg-gradient-to-r from-amber-50 to-orange-50'}`}>
                                             {(() => {
                                                 const ventasPorFecha = ventas.filter(v => v.fecha && v.fecha.slice(0, 10) === filterDate);
                                                 const total = ventasPorFecha.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
@@ -2858,12 +2891,12 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                                 return (<div>
                                                     <p className="text-lg font-bold text-orange-700 mb-3">📅 Ventas del {filterDate}</p>
                                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                                        <div className="bg-white p-4 rounded-xl shadow">
-                                                            <p className="text-sm text-gray-600">Unidades</p>
+                                                        <div className={`${darkMode ? 'bg-gray-600' : 'bg-white'} p-4 rounded-xl shadow`}>
+                                                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Unidades</p>
                                                             <p className="text-2xl font-bold text-blue-600">{unidades}</p>
                                                         </div>
-                                                        <div className="bg-white p-4 rounded-xl shadow">
-                                                            <p className="text-sm text-gray-600">Paquetes</p>
+                                                        <div className={`${darkMode ? 'bg-gray-600' : 'bg-white'} p-4 rounded-xl shadow`}>
+                                                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Paquetes</p>
                                                             <p className="text-2xl font-bold text-purple-600">{Math.floor(unidades / 10)}+{unidades % 10}</p>
                                                         </div>
                                                     </div>
@@ -2871,16 +2904,24 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                             })()}
                                         </div>
                                     )}
-
+                                    {ventasSeleccionadas.size > 0 && (
+                                        <div className={`flex flex-wrap items-center gap-2 p-2 rounded-xl mb-4 border-2 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-300'}`}>
+                                            <span className={`font-bold text-xs ${darkMode ? 'text-white' : 'text-blue-800'}`}>☑️ {ventasSeleccionadas.size}</span>
+                                            <button onClick={abrirDuplicar} className="px-2 py-1 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 transition">📋 Duplicar</button>
+                                            <button onClick={eliminarSeleccionadas} className="px-2 py-1 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition">🗑️ Eliminar</button>
+                                            <button onClick={limpiarSeleccion} className={`px-2 py-1 rounded-lg text-xs font-medium transition ${darkMode ? 'bg-gray-600 text-white hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>✕</button>
+                                        </div>
+                                    )}
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
                                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
                                             <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Historial ({ventasFiltradas.length})</h3>
                                             <button
                                                 onClick={() => setOrdenAlfabetico(!ordenAlfabetico)}
-                                                className={`px-4 py-2 rounded-lg transition font-medium ${ordenAlfabetico ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
+                                                className={`px-4 py-2 rounded-lg transition font-medium ${ordenAlfabetico ? 'bg-green-600 text-white' : darkMode ? 'bg-green-900 text-green-200 hover:bg-green-800' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
                                                 🔤 {ordenAlfabetico ? 'Orden por fecha' : 'Ordenar A-Z'}
                                             </button>
                                         </div>
+                                      
                                         <button
                                             onClick={() => {
                                                 const sorted = [...ventasFiltradas].sort((a, b) =>
@@ -2888,103 +2929,152 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                                 );
                                                 setVentas(sorted);
                                             }}
-                                            className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium">
+                                            className={`px-4 py-2 rounded-lg transition font-medium ${darkMode ? 'bg-blue-900 text-blue-200 hover:bg-blue-800' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>
                                             🔤 Ordenar A-Z
                                         </button>
                                     </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                            <thead><tr className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Cliente</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Cantidad</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Total</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Abono</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Saldo</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Estado</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Fecha</th><th className={`p-4 text-left font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Acciones</th></tr></thead>
-                                            <tbody>
-                                                {ventasFiltradas.map(v => {
-                                                    const total = parseFloat(v.total) || 0;
-                                                    const abono = parseFloat(v.abono) || 0;
-                                                    const saldo = total - abono;
-                                                    return (<tr key={v.id} className={`border-t ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'} transition`}>
-                                                        <td className={`p-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{v.clientes?.nombre || 'N/A'}</td>
-                                                        <td className="p-4">
-                                                            <input
-                                                                type="number"
-                                                                defaultValue={v.cantidad}
-                                                                onBlur={async (e) => {
-                                                                    const nuevaCantidad = parseInt(e.target.value);
-                                                                    if (nuevaCantidad && nuevaCantidad > 0) {
-                                                                        const precioUnitario = parseFloat(v.precio_unitario) || (v.tipo_cantidad === 'Unidades' ? 600 : 6000);
-                                                                        const nuevoTotal = nuevaCantidad * precioUnitario;
-                                                                        const abonoActual = parseFloat(v.abono) || 0;
-                                                                        const nuevoEstado = abonoActual >= nuevoTotal ? 'Pagado' : 'Pendiente';
-
-                                                                        const { error } = await supabaseClient.from('ventas').update({
-                                                                            cantidad: nuevaCantidad,
-                                                                            total: nuevoTotal,
-                                                                            estado_pago: nuevoEstado
-                                                                        }).eq('id', v.id);
-
-                                                                        if (error) {
-                                                                            pushToast('Error al actualizar', 'error');
-                                                                        } else {
-                                                                            pushToast('✅ Cantidad y total actualizados');
-                                                                            loadData();
-                                                                        }
-                                                                    }
-                                                                }}
-                                                                className={`w-20 p-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}
-                                                            />
-                                                            <span className={`ml-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{v.tipo_cantidad}</span>
-                                                        </td>
-                                                        <td className="p-4 font-bold text-green-600">{formatCOP(total)}</td>
-                                                        <td className="p-4"><span className={`font-bold ${abono > 0 ? 'text-blue-600' : 'text-gray-400'}`}>{formatCOP(abono)}</span></td>
-                                                        <td className="p-4"><span className={`font-bold ${saldo > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCOP(saldo)}</span></td>
-                                                        <td className="p-4">
-                                                            <button onClick={() => {
-                                                                if (v.estado_pago === 'Pagado') {
-                                                                    showConfirm(
-                                                                        '⏳ Marcar como Pendiente',
-                                                                        '¿Cambiar esta venta a pendiente?',
-                                                                        () => setPagoVenta(v, 'Pendiente')
-                                                                    );
-                                                                } else {
-                                                                    showConfirm(
-                                                                        '✅ Marcar como Pagado',
-                                                                        '¿Marcar esta venta como pagada completamente?',
-                                                                        () => setPagoVenta(v, 'Pagado')
-                                                                    );
-                                                                }
-                                                            }} className={`px-4 py-2 rounded-xl font-medium transition ${v.estado_pago === 'Pagado' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
-                                                                {v.estado_pago === 'Pagado' ? '✅ Pagado' : '⏳ Pendiente'}
-                                                            </button>
-                                                        </td>
-                                                        <td className="p-4"></td>
-                                                        <td className="p-4"><input type="date" defaultValue={v.fecha ? v.fecha.slice(0, 10) : ''} onBlur={(e) => updateFechaVenta(v.id, e.target.value)} className={`p-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
-                                                            <div className="flex gap-2 flex-wrap">
-                                                                <button onClick={() => {
-                                                                    showPrompt(
-                                                                        '💰 Agregar Abono',
-                                                                        `Saldo pendiente: ${formatCOP(saldo)}\n\nIngresa el monto a abonar:`,
-                                                                        '0',
-                                                                        (ab) => {
-                                                                            if (!ab || ab === '') return;
-                                                                            const monto = parseFloat(ab);
-                                                                            if (isNaN(monto) || monto <= 0) {
-                                                                                pushToast('Ingresa un monto válido', 'error');
-                                                                                return;
-                                                                            }
-                                                                            if (monto > saldo) {
-                                                                                pushToast('El abono no puede ser mayor al saldo', 'error');
-                                                                                return;
-                                                                            }
-                                                                            setPagoVenta(v, 'Abono', monto);
-                                                                        }
-                                                                    );
-                                                                }} className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium text-sm">💰 Abonar</button>
-                                                                <button onClick={() => deleteVenta(v.id)} className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium text-sm">🗑️</button>
-                                                                {v.notas && <button onClick={() => setNotaModal(v.notas)} className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs hover:bg-amber-200 transition">📝 Ver</button>}
+                                    <div className="space-y-2">
+                                        {(() => {
+                                            // Agrupar ventas por fecha
+                                            const grupos = {};
+                                            ventasFiltradas.forEach(v => {
+                                                const fechaKey = v.fecha ? v.fecha.slice(0, 10) : 'sin-fecha';
+                                            const fechaLabel = v.fecha
+                                                    ? (() => {
+                                                        const d = new Date(v.fecha.length === 10 ? v.fecha + 'T00:00:00' : v.fecha);
+                                                        return isNaN(d) ? v.fecha.slice(0,10) : d.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                                                    })()
+                                                    : 'Sin fecha';
+                                                if (!grupos[fechaKey]) grupos[fechaKey] = { label: fechaLabel, ventas: [], key: fechaKey };
+                                                grupos[fechaKey].ventas.push(v);
+                                            });
+                                            const gruposOrdenados = Object.values(grupos).sort((a, b) => {
+                                                if (a.key === 'sin-fecha') return 1;
+                                                if (b.key === 'sin-fecha') return -1;
+                                                return b.key.localeCompare(a.key);
+                                            });
+                                            return gruposOrdenados.map(grupo => {
+                                                const abierto = fechasAbiertas[grupo.key] !== false;
+                                                const totalGrupo = grupo.ventas.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
+                                                const pendientesGrupo = grupo.ventas.filter(v => v.estado_pago === 'Pendiente').length;
+                                                return (
+                                                    <div key={grupo.key} className={`rounded-xl border-2 overflow-hidden ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                                        {/* Encabezado fecha - clic para abrir/cerrar */}
+                                                        <button
+                                                            onClick={() => toggleFecha(grupo.key)}
+                                                            className={`w-full flex items-center justify-between p-3 md:p-4 text-left transition ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'}`}>
+                                                            <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+                                                                <span className="text-base md:text-lg font-bold capitalize">{grupo.label}</span>
+                                                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-white text-gray-600'}`}>
+                                                                    {grupo.ventas.length} venta{grupo.ventas.length !== 1 ? 's' : ''}
+                                                                </span>
+                                                                {pendientesGrupo > 0 && (
+                                                                    <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-medium">
+                                                                        ⏳ {pendientesGrupo} pendiente{pendientesGrupo !== 1 ? 's' : ''}
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                        </td>
-                                                    </tr>);
-                                                })}
-                                            </tbody>
-                                        </table>
+                                                            <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                                                                <span className="font-bold text-green-600 text-sm md:text-base">{formatCOP(totalGrupo)}</span>
+                                                                <span className={`text-lg transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`}>▼</span>
+                                                            </div>
+                                                        </button>
+                                                        {/* Ventas del grupo */}
+                                                        {abierto && (
+                                                            <div className="overflow-x-auto">
+                                                                <table className="w-full text-sm">
+                                                                    <thead><tr className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                                                                        <th className={`p-2 md:p-3 text-left font-semibold text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Cliente</th>
+                                                                        <th className={`p-2 md:p-3 text-left font-semibold text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Cantidad</th>
+                                                                        <th className={`p-2 md:p-3 text-left font-semibold text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Total</th>
+                                                                        <th className={`p-2 md:p-3 text-left font-semibold text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Abono</th>
+                                                                        <th className={`p-2 md:p-3 text-left font-semibold text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Saldo</th>
+                                                                        <th className={`p-2 md:p-3 text-left font-semibold text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Estado</th>
+                                                                        <th className={`p-2 md:p-3 text-left font-semibold text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Fecha</th>
+                                                                        <th className={`p-2 md:p-3 text-left font-semibold text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Acciones</th>
+                                                                    </tr></thead>
+                                                                    <tbody>
+                                                                        {grupo.ventas.map(v => {
+                                                                            const total = parseFloat(v.total) || 0;
+                                                                            const abono = parseFloat(v.abono) || 0;
+                                                                            const saldo = total - abono;
+                                                                            return (<tr key={v.id} className={`border-t ${darkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-100 hover:bg-gray-50'} transition`}>
+                                                                                <td className="p-2 md:p-3">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <input type="checkbox" checked={ventasSeleccionadas.has(v.id)} onChange={() => toggleSeleccion(v.id)} className="w-4 h-4 accent-orange-500 cursor-pointer" />
+                                                                                        <span className={`font-medium text-xs md:text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{v.clientes?.nombre || 'N/A'}</span>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="p-2 md:p-3">
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        defaultValue={v.cantidad}
+                                                                                        onBlur={async (e) => {
+                                                                                            const nuevaCantidad = parseInt(e.target.value);
+                                                                                            if (nuevaCantidad && nuevaCantidad > 0) {
+                                                                                                const precioUnitario = parseFloat(v.precio_unitario) || (v.tipo_cantidad === 'Unidades' ? 600 : 6000);
+                                                                                                const nuevoTotal = nuevaCantidad * precioUnitario;
+                                                                                                const abonoActual = parseFloat(v.abono) || 0;
+                                                                                                const nuevoEstado = abonoActual >= nuevoTotal ? 'Pagado' : 'Pendiente';
+                                                                                                const { error } = await supabaseClient.from('ventas').update({
+                                                                                                    cantidad: nuevaCantidad,
+                                                                                                    total: nuevoTotal,
+                                                                                                    estado_pago: nuevoEstado
+                                                                                                }).eq('id', v.id);
+                                                                                                if (error) {
+                                                                                                    pushToast('Error al actualizar', 'error');
+                                                                                                } else {
+                                                                                                    pushToast('✅ Cantidad y total actualizados');
+                                                                                                    loadData();
+                                                                                                }
+                                                                                            }
+                                                                                        }}
+                                                                                        className={`w-16 p-1 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 text-xs ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}
+                                                                                    />
+                                                                                    <span className={`ml-1 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{v.tipo_cantidad}</span>
+                                                                                </td>
+                                                                                <td className="p-2 md:p-3 font-bold text-green-600 text-xs md:text-sm">{formatCOP(total)}</td>
+                                                                                <td className="p-2 md:p-3 text-xs md:text-sm"><span className={`font-bold ${abono > 0 ? 'text-blue-600' : 'text-gray-400'}`}>{formatCOP(abono)}</span></td>
+                                                                                <td className="p-2 md:p-3 text-xs md:text-sm"><span className={`font-bold ${saldo > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCOP(saldo)}</span></td>
+                                                                                <td className="p-2 md:p-3">
+                                                                                    <button onClick={() => {
+                                                                                        if (v.estado_pago === 'Pagado') {
+                                                                                            showConfirm('⏳ Marcar como Pendiente', '¿Cambiar esta venta a pendiente?', () => setPagoVenta(v, 'Pendiente'));
+                                                                                        } else {
+                                                                                            showConfirm('✅ Marcar como Pagado', '¿Marcar esta venta como pagada completamente?', () => setPagoVenta(v, 'Pagado'));
+                                                                                        }
+                                                                                    }} className={`px-2 py-1 rounded-lg font-medium transition text-xs ${v.estado_pago === 'Pagado' ? darkMode ? 'bg-green-900 text-green-200 hover:bg-green-800' : 'bg-green-100 text-green-700 hover:bg-green-200' : darkMode ? 'bg-yellow-900 text-yellow-200 hover:bg-yellow-800' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
+                                                                                        {v.estado_pago === 'Pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+                                                                                    </button>
+                                                                                </td>
+                                                                                <td className="p-2 md:p-3">
+                                                                                    <input type="date" defaultValue={v.fecha ? v.fecha.slice(0, 10) : ''} onBlur={(e) => updateFechaVenta(v.id, e.target.value)} className={`p-1 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 text-xs ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                                                                </td>
+                                                                                <td className="p-2 md:p-3">
+                                                                                    <div className="flex gap-1 flex-wrap">
+                                                                                        <button onClick={() => {
+                                                                                            showPrompt('💰 Agregar Abono', `Saldo pendiente: ${formatCOP(saldo)}\n\nIngresa el monto a abonar:`, '0', (ab) => {
+                                                                                                if (!ab || ab === '') return;
+                                                                                                const monto = parseFloat(ab);
+                                                                                                if (isNaN(monto) || monto <= 0) { pushToast('Ingresa un monto válido', 'error'); return; }
+                                                                                                if (monto > saldo) { pushToast('El abono no puede ser mayor al saldo', 'error'); return; }
+                                                                                                setPagoVenta(v, 'Abono', monto);
+                                                                                            });
+                                                                                        }} className={`px-2 py-1 rounded-lg transition font-medium text-xs ${darkMode ? 'bg-blue-900 text-blue-200 hover:bg-blue-800' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>💰 Abonar</button>
+                                                                                        <button onClick={() => deleteVenta(v.id)} className={`px-2 py-1 rounded-lg transition font-medium text-xs ${darkMode ? 'bg-red-900 text-red-200 hover:bg-red-800' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}>🗑️</button>
+                                                                                        {v.notas && <button onClick={() => setNotaModal(v.notas)} className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs hover:bg-amber-200 transition">📝</button>}
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>);
+                                                                        })}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
                                     </div>
                                 </div>
                             </div>
@@ -3478,17 +3568,17 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                         <span>💡</span> Análisis Rápido
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="bg-white p-4 rounded-xl shadow">
+                                        <div className={`${darkMode ? 'bg-gray-600' : 'bg-white'} p-4 rounded-xl shadow`}>
                                             <p className="text-sm text-gray-600 mb-1">Tasa de cobro</p>
                                             <p className="text-2xl font-bold text-blue-600">
                                                 {resumen.totalVentas > 0 ? Math.round((resumen.totalAbonos / resumen.totalVentas) * 100) : 0}%
                                             </p>
                                         </div>
-                                        <div className="bg-white p-4 rounded-xl shadow">
+                                        <div className={`${darkMode ? 'bg-gray-600' : 'bg-white'} p-4 rounded-xl shadow`}>
                                             <p className="text-sm text-gray-600 mb-1">Clientes activos</p>
                                             <p className="text-2xl font-bold text-green-600">{clientes.filter(c => c.activo !== false).length}</p>
                                         </div>
-                                        <div className="bg-white p-4 rounded-xl shadow">
+                                        <div className={`${darkMode ? 'bg-gray-600' : 'bg-white'} p-4 rounded-xl shadow`}>
                                             <p className="text-sm text-gray-600 mb-1">Ventas registradas</p>
                                             <p className="text-2xl font-bold text-orange-600">{ventas.length}</p>
                                         </div>
@@ -3667,7 +3757,7 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                                             <div key={v.id} className={`${darkMode ? 'bg-gray-700' : 'bg-white'} p-3 rounded-lg flex justify-between items-center`}>
                                                                 <div>
                                                                     <p className="font-semibold">{v.cantidad} {v.tipo_cantidad}</p>
-                                                                    <p className="text-sm text-gray-500">{v.fecha ? new Date(v.fecha).toLocaleDateString('es-CO') : 'Sin fecha'}</p>
+                                                                    <p className="text-sm text-gray-500">{v.fecha ? new Date(v.fecha + 'T00:00:00').toLocaleDateString('es-CO') : 'Sin fecha'}</p>
                                                                 </div>
                                                                 <div className="text-right">
                                                                     <p className="text-sm text-gray-500">Total: {formatCOP(v.total)}</p>
@@ -3692,7 +3782,7 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                                                     <div>
                                                                         <p className="font-semibold">{v.cantidad} {v.tipo_cantidad}</p>
                                                                         <p className="text-sm text-gray-500">
-                                                                            {v.fecha ? new Date(v.fecha).toLocaleDateString('es-CO') : 'Sin fecha'}
+                                                                            {v.fecha ? new Date(v.fecha + 'T00:00:00').toLocaleDateString('es-CO') : 'Sin fecha'}
                                                                             {v.semana && ` • ${v.semana}`}
                                                                         </p>
                                                                     </div>
@@ -4232,6 +4322,103 @@ const supabase = supabaseClient; // Alias para mantener compatibilidad
                                             👍 Entendido
                                         </button>
                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {modalDuplicar && (
+                        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 md:p-4" onClick={() => setModalDuplicar(null)}>
+                            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto scale-in`} onClick={e => e.stopPropagation()}>
+                                <div className="p-4 md:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 z-10 rounded-t-2xl" style={{ background: darkMode ? '#1f2937' : 'white' }}>
+                                    <div>
+                                        <h3 className="text-lg font-bold flex items-center gap-2">📋 Duplicar {modalDuplicar.length} venta{modalDuplicar.length !== 1 ? 's' : ''}</h3>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <label className="text-xs font-semibold text-gray-500">📅 Fecha para todas:</label>
+                                            <input type="date" value={fechaDuplicar} onChange={e => setFechaDuplicar(e.target.value)}
+                                                className={`p-1 border-2 rounded-lg text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setModalDuplicar(null)} className="text-2xl hover:text-red-500 transition">×</button>
+                                </div>
+                                <div className="p-4 md:p-6 space-y-4">
+                                    {modalDuplicar.map((v, idx) => (
+                                        <div key={v.id} className={`p-4 rounded-xl border-2 ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-gray-50'}`}>
+                                            <p className="font-bold mb-3 text-sm text-orange-500">Venta #{idx + 1} — {v.clientes?.nombre || 'Cliente'}</p>
+                                           <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="text-xs font-semibold mb-1 block">Cliente</label>
+                                                    <select
+                                                        value={v._editCliente}
+                                                        onChange={e => setModalDuplicar(prev => prev.map((x, i) => i === idx ? { ...x, _editCliente: e.target.value } : x))}
+                                                        className={`w-full p-2 border-2 rounded-lg text-xs ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`}>
+                                                        {clientes.filter(c => c.activo !== false).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold mb-1 block">Cantidad</label>
+                                                    <input type="number" min="1" value={v._editCantidad}
+                                                        onChange={e => {
+                                                            const cant = parseInt(e.target.value) || 1;
+                                                            const precio = parseFloat(v._editPrecioUnitario) || 0;
+                                                            setModalDuplicar(prev => prev.map((x, i) => i === idx ? { ...x, _editCantidad: cant, _editTotal: precio > 0 ? cant * precio : x._editTotal } : x));
+                                                        }}
+                                                        className={`w-full p-2 border-2 rounded-lg text-xs ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold mb-1 block">Precio unitario</label>
+                                                    <input type="number" value={v._editPrecioUnitario || ''}
+                                                        placeholder="Precio c/u"
+                                                        onChange={e => {
+                                                            const precio = parseFloat(e.target.value) || 0;
+                                                            const cant = parseInt(v._editCantidad) || 1;
+                                                            setModalDuplicar(prev => prev.map((x, i) => i === idx ? { ...x, _editPrecioUnitario: precio, _editTotal: precio > 0 ? cant * precio : x._editTotal } : x));
+                                                        }}
+                                                        className={`w-full p-2 border-2 rounded-lg text-xs ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold mb-1 block">Total</label>
+                                                    <input type="number" value={v._editTotal}
+                                                        onChange={e => setModalDuplicar(prev => prev.map((x, i) => i === idx ? { ...x, _editTotal: e.target.value } : x))}
+                                                        className={`w-full p-2 border-2 rounded-lg text-xs ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <label className="text-xs font-semibold mb-1 block">📝 Notas</label>
+                                                    <input type="text" value={v._editNotas || ''} placeholder="Notas opcionales"
+                                                        onChange={e => setModalDuplicar(prev => prev.map((x, i) => i === idx ? { ...x, _editNotas: e.target.value } : x))}
+                                                        className={`w-full p-2 border-2 rounded-lg text-xs ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div className="flex gap-3 pt-2">
+                                        <button
+                                            onClick={async () => {
+                                                for (const v of modalDuplicar) {
+                                                    const fechaISO = fechaDuplicar ? new Date(fechaDuplicar + 'T12:00:00').toISOString() : new Date().toISOString();
+                                                    await supabaseClient.from('ventas').insert({
+                                                        cliente_id: v._editCliente,
+                                                        cantidad: parseInt(v._editCantidad) || v.cantidad,
+                                                        total: parseFloat(v._editTotal) || v.total,
+                                                        tipo_cantidad: v.tipo_cantidad,
+                                                        estado_pago: 'Pendiente',
+                                                        abono: 0,
+                                                        fecha: fechaISO,
+                                                        notas: v._editNotas || null,
+                                                        notas: v._editNotas || null, precio_unitario: parseFloat(v._editPrecioUnitario) || null,
+                                                    });
+                                                }
+                                                pushToast(`✅ ${modalDuplicar.length} venta${modalDuplicar.length !== 1 ? 's' : ''} duplicada${modalDuplicar.length !== 1 ? 's' : ''}`);
+                                                setModalDuplicar(null);
+                                                limpiarSeleccion();
+                                                loadData();
+                                            }}
+                                            className="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 rounded-xl font-bold hover:from-purple-700 hover:to-purple-800 transition shadow-lg">
+                                            ✅ Guardar como nuevas ventas
+                                        </button>
+                                        <button onClick={() => setModalDuplicar(null)} className={`px-6 py-3 rounded-xl font-bold transition ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
+                                            ❌
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
