@@ -692,6 +692,7 @@
             const [pedidoForm, setPedidoForm] = useState({ fecha: '', cliente_id: '', cantidad: '', tipo_cantidad: 'Unidades', notas: '' });
             const [fechaSeleccionadaPedidos, setFechaSeleccionadaPedidos] = useState('');
             const [ordenAlfabetico, set0rdenAlfabetico] = useState(false);
+            const [ordenZA, setOrdenZA] = useState(false);
             const [fechasAbiertas, setFechasAbiertas] = useState({});
             const toggleFecha = (fecha) => setFechasAbiertas(prev => ({ ...prev, [fecha]: !prev[fecha] }));
             const [ventasSeleccionadas, setVentasSeleccionadas] = useState(new Set());
@@ -1571,9 +1572,12 @@ const loadData = async () => {
                 if (filterEstado === 'Pagadas') return v.estado_pago === 'Pagado';
                 if (filterEstado === 'Pendientes') return v.estado_pago === 'Pendiente';
                 return true;
-            }).sort((a, b) => {
+                }).sort((a, b) => {
                 if (ordenAlfabetico) {
                     return (a.clientes?.nombre || '').localeCompare(b.clientes?.nombre || '', 'es', { sensitivity: 'base' });
+                }
+                if (ordenZA) {
+                    return (b.clientes?.nombre || '').localeCompare(a.clientes?.nombre || '', 'es', { sensitivity: 'base' });
                 }
                 return 0;
             });
@@ -2605,9 +2609,12 @@ const loadData = async () => {
 
                                 <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-indigo-500`}>
                                     <h2 className="text-2xl font-bold mb-6">Filtros y Búsqueda</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                        <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
-                                        <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                        <div>
+                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📅 Filtrar por fecha</label>
+                                            <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        </div>
+                                    <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
                                             <option value="Todos">Todas</option>
                                             <option value="Pagadas">✅ Pagadas</option>
                                             <option value="Pendientes">⏳ Pendientes</option>
@@ -2645,25 +2652,17 @@ const loadData = async () => {
                                             <button onClick={limpiarSeleccion} className={`px-2 py-1 rounded-lg text-xs font-medium transition ${darkMode ? 'bg-gray-600 text-white hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>✕</button>
                                         </div>
                                     )}
-                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-                                            <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Historial ({ventasFiltradas.length})</h3>
-                                            <button
-                                                onClick={() => setOrdenAlfabetico(!ordenAlfabetico)}
-                                                className={`px-4 py-2 rounded-lg transition font-medium ${ordenAlfabetico ? 'bg-green-600 text-white' : darkMode ? 'bg-green-900 text-green-200 hover:bg-green-800' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
-                                                🔤 {ordenAlfabetico ? 'Orden por fecha' : 'Ordenar A-Z'}
-                                            </button>
-                                        </div>
-                                      
+                               <div className="flex flex-wrap items-center gap-2 mb-4">
+                                        <h3 className={`text-xl font-bold mr-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Historial ({ventasFiltradas.length})</h3>
                                         <button
-                                            onClick={() => {
-                                                const sorted = [...ventasFiltradas].sort((a, b) =>
-                                                    (a.clientes?.nombre || '').localeCompare(b.clientes?.nombre || '', 'es', { sensitivity: 'base' })
-                                                );
-                                                setVentas(sorted);
-                                            }}
-                                            className={`px-4 py-2 rounded-lg transition font-medium ${darkMode ? 'bg-blue-900 text-blue-200 hover:bg-blue-800' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>
-                                            🔤 Ordenar A-Z
+                                            onClick={() => { set0rdenAlfabetico(!ordenAlfabetico); setOrdenZA(false); }}
+                                            className={`px-3 py-2 rounded-lg transition font-medium text-sm ${ordenAlfabetico ? 'bg-green-600 text-white' : darkMode ? 'bg-green-900 text-green-200 hover:bg-green-800' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
+                                            🔤 {ordenAlfabetico ? '✕ A-Z' : 'A-Z'}
+                                        </button>
+                                        <button
+                                            onClick={() => { setOrdenZA(!ordenZA); set0rdenAlfabetico(false); }}
+                                            className={`px-3 py-2 rounded-lg transition font-medium text-sm ${ordenZA ? 'bg-blue-600 text-white' : darkMode ? 'bg-blue-900 text-blue-200 hover:bg-blue-800' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>
+                                            🔤 {ordenZA ? '✕ Z-A' : 'Z-A'}
                                         </button>
                                     </div>
                                     <div className="space-y-2">
