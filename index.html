@@ -2939,10 +2939,12 @@
                                             const grupos = {};
                                             ventasFiltradas.forEach(v => {
                                                 const fechaKey = v.fecha ? v.fecha.slice(0, 10) : 'sin-fecha';
-                                            const fechaLabel = v.fecha
+                                                const fechaLabel = v.fecha
                                                     ? (() => {
-                                                        const d = new Date(v.fecha.length === 10 ? v.fecha + 'T00:00:00' : v.fecha);
-                                                        return isNaN(d) ? v.fecha.slice(0,10) : d.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                                                        const raw = v.fecha.slice(0, 10); // siempre YYYY-MM-DD sin zona horaria
+                                                        const [y, m, d] = raw.split('-').map(Number);
+                                                        const fecha = new Date(y, m - 1, d); // constructor local, sin UTC
+                                                        return isNaN(fecha) ? raw : fecha.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                                                     })()
                                                     : 'Sin fecha';
                                                 if (!grupos[fechaKey]) grupos[fechaKey] = { label: fechaLabel, ventas: [], key: fechaKey };
