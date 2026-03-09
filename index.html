@@ -17,11 +17,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -233,7 +230,13 @@
                 touch-action: manipulation;
             }
         }
-
+        /* Reducir animaciones en móvil para mejor rendimiento */
+        @media (max-width: 768px) {
+            .pulse-hover:hover { animation: none; }
+            .float-animation { animation: none; }
+            .fade-in { animation: none; }
+            .scale-in { animation: none; }
+        }
         /* Tablas responsivas */
         @media (max-width: 768px) {
             table {
@@ -725,11 +728,7 @@
             const [precioUnidad, setPrecioUnidad] = useState(600);
             const [precioPaquete, setPrecioPaquete] = useState(6000);
             const [mostrarConfigPrecios, setMostrarConfigPrecios] = useState(false);
-            // Estados para exportar Excel
-            const [mostrarModalExcel, setMostrarModalExcel] = useState(false);
-            const [fechaDesdeExcel, setFechaDesdeExcel] = useState('');
-            const [fechaHastaExcel, setFechaHastaExcel] = useState('');
-            // Estados para compras de materia prima
+             // Estados para compras de materia prima
             const [compras, setCompras] = useState([]);
             const [compraForm, setCompraForm] = useState({
                 concepto: '',
@@ -886,256 +885,8 @@
                 }
             };
 
-            // Función para generar reporte PDF
-            const generarReportePDF = async () => {
-                setIsLoading(true);
-                try {
-                    const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF();
-
-                    // Título
-                    doc.setFontSize(20);
-                    doc.setTextColor(255, 140, 0);
-                    doc.text('Arepas al Carbón 🌽', 20, 20);
-
-                    doc.setFontSize(16);
-                    doc.setTextColor(0, 0, 0);
-                    doc.text('Reporte de Ventas', 20, 30);
-
-                    // Fecha del reporte
-                    doc.setFontSize(10);
-                    doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')}`, 20, 40);
-
-                    let y = 50;
-
-                    // Resumen general
-                    doc.setFontSize(14);
-                    doc.text('Resumen General', 20, y);
-                    y += 10;
-
-                    doc.setFontSize(10);
-                    doc.text(`Total Ventas: ${formatCOP(ventas.reduce((s, v) => s + (parseFloat(v.total) || 0), 0))}`, 20, y);
-                    y += 7;
-                    doc.text(`Total Abonado: ${formatCOP(ventas.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0))}`, 20, y);
-                    y += 7;
-                    doc.text(`Deudas Pendientes: ${formatCOP(ventasPendientes)}`, 20, y);
-                    y += 7;
-                    doc.text(`Balance: ${formatCOP(balanceGlobal)}`, 20, y);
-                    y += 15;
-
-                    // Top clientes
-                    doc.setFontSize(14);
-                    doc.text('Top 5 Clientes', 20, y);
-                    y += 10;
-
-                    const topClientes = calcularTopClientes().slice(0, 5);
-                    doc.setFontSize(9);
-                    topClientes.forEach((cliente, idx) => {
-                        doc.text(`${idx + 1}. ${cliente.nombre} - ${formatCOP(cliente.totalCompras)}`, 20, y);
-                        y += 6;
-                    });
-
-                    doc.save('reporte-arepas.pdf');
-                    pushToast('📄 Reporte descargado');
-                } catch (error) {
-                    console.error('Error generando PDF:', error);
-                    pushToast('Error al generar reporte', 'error');
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-            // Generar reporte Excel con comparación
-            const generarReporteExcel = async () => {
-                if (!fechaDesdeExcel || !fechaHastaExcel) {
-                    pushToast('Selecciona ambas fechas', 'error');
-                    return;
-                }
-
-                setIsLoading(true);
-                setMostrarModalExcel(false);
-
-                try {
-                    const desde = new Date(fechaDesdeExcel);
-                    const hasta = new Date(fechaHastaExcel);
-
-                    // Calcular mes anterior para comparación
-                    const mesAnteriorDesde = new Date(desde);
-                    mesAnteriorDesde.setMonth(mesAnteriorDesde.getMonth() - 1);
-                    const mesAnteriorHasta = new Date(hasta);
-                    mesAnteriorHasta.setMonth(mesAnteriorHasta.getMonth() - 1);
-
-                    const filtrarFecha = (fecha, inicio, fin) => {
-                        const f = new Date(fecha);
-                        return f >= inicio && f <= fin;
-                    };
-
-                    // Datos período actual
-                    const ventasActual = ventas.filter(v => v.fecha && filtrarFecha(v.fecha, desde, hasta));
-                    const ingresosActual = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha, desde, hasta));
-                    const egresosActual = egresos.filter(e => e.fecha && filtrarFecha(e.fecha, desde, hasta));
-
-                    // Datos mes anterior
-                    const ventasAnterior = ventas.filter(v => v.fecha && filtrarFecha(v.fecha, mesAnteriorDesde, mesAnteriorHasta));
-                    const ingresosAnterior = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha, mesAnteriorDesde, mesAnteriorHasta));
-                    const egresosAnterior = egresos.filter(e => e.fecha && filtrarFecha(e.fecha, mesAnteriorDesde, mesAnteriorHasta));
-
-                    // Calcular totales actuales
-                    const totalVentasActual = ventasActual.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
-                    const totalAbonosActual = ventasActual.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0);
-                    const totalIngresosActual = ingresosActual.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
-                    const totalEgresosActual = egresosActual.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
-                    const balanceActual = totalIngresosActual - totalEgresosActual;
-
-                    // Calcular totales anteriores
-                    const totalVentasAnterior = ventasAnterior.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
-                    const totalAbonosAnterior = ventasAnterior.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0);
-                    const totalIngresosAnterior = ingresosAnterior.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
-                    const totalEgresosAnterior = egresosAnterior.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
-                    const balanceAnterior = totalIngresosAnterior - totalEgresosAnterior;
-
-                    // Calcular variaciones
-                    const varVentas = totalVentasAnterior > 0 ? ((totalVentasActual - totalVentasAnterior) / totalVentasAnterior * 100).toFixed(2) : 0;
-                    const varIngresos = totalIngresosAnterior > 0 ? ((totalIngresosActual - totalIngresosAnterior) / totalIngresosAnterior * 100).toFixed(2) : 0;
-                    const varEgresos = totalEgresosAnterior > 0 ? ((totalEgresosActual - totalEgresosAnterior) / totalEgresosAnterior * 100).toFixed(2) : 0;
-                    const varBalance = balanceAnterior > 0 ? ((balanceActual - balanceAnterior) / balanceAnterior * 100).toFixed(2) : 0;
-
-                    // Crear libro de Excel
-                    const wb = XLSX.utils.book_new();
-                    // HOJA 1: RESUMEN COMPARATIVO
-                    const resumenData = [
-                        ['🫓 AREPAS AL CARBÓN 🌽'],
-                        ['REPORTE FINANCIERO COMPARATIVO'],
-                        [''],
-                        ['Generado:', new Date().toLocaleString('es-CO')],
-                        [''],
-                        ['═══════════════════════════════════════════════════════════'],
-                        [''],
-                        ['📊 PERÍODO ACTUAL:', `${desde.toLocaleDateString('es-CO')} al ${hasta.toLocaleDateString('es-CO')}`],
-                        ['📅 PERÍODO ANTERIOR:', `${mesAnteriorDesde.toLocaleDateString('es-CO')} al ${mesAnteriorHasta.toLocaleDateString('es-CO')}`],
-                        [''],
-                        ['═══════════════════════════════════════════════════════════'],
-                        [''],
-                        ['CONCEPTO', 'PERÍODO ACTUAL', 'PERÍODO ANTERIOR', 'DIFERENCIA', '% CAMBIO'],
-                        ['───────────────────────────────────────────────────────────'],
-                    ];
-
-                    const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
-                    wsResumen['!cols'] = [{ wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 15 }, { wch: 12 }];
-                    // Estilo para la hoja (ancho de columnas)
-                    wsResumen['!cols'] = [
-                        { wch: 25 }, // Concepto
-                        { wch: 20 }, // Período Actual
-                        { wch: 20 }, // Período Anterior
-                        { wch: 18 }, // Diferencia
-                        { wch: 15 }  // % Cambio
-                    ];
-
-                    // Combinar celdas del título
-                    wsResumen['!merges'] = [
-                        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, // Título principal
-                        { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }  // Subtítulo
-                    ];
-                    XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen Comparativo');
-
-                    // HOJA 2: DETALLE VENTAS
-                    const ventasDetalle = [
-                        ['DETALLE DE VENTAS - PERÍODO ACTUAL'],
-                        [''],
-                        ['Fecha', 'Cliente', 'Cantidad', 'Tipo', 'Total', 'Abono', 'Saldo', 'Estado']
-                    ];
-
-                    ventasActual.forEach(v => {
-                        ventasDetalle.push([
-                            v.fecha ? new Date(v.fecha + 'T00:00:00').toLocaleDateString('es-CO') : '',
-                            v.clientes?.nombre || '',
-                            v.cantidad,
-                            v.tipo_cantidad,
-                            parseFloat(v.total) || 0,
-                            parseFloat(v.abono) || 0,
-                            (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0),
-                            v.estado_pago
-                        ]);
-                    });
-
-                    const wsVentas = XLSX.utils.aoa_to_sheet(ventasDetalle);
-                    wsVentas['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }];
-                    XLSX.utils.book_append_sheet(wb, wsVentas, 'Detalle Ventas');
-
-                    // HOJA 3: TOP CLIENTES
-                    const topClientes = calcularTopClientes().slice(0, 10);
-                    const topClientesData = [
-                        ['TOP 10 CLIENTES'],
-                        [''],
-                        ['Ranking', 'Cliente', 'Total Comprado', 'Cantidad Compras', 'Última Compra']
-                    ];
-
-                    topClientes.forEach((cliente, idx) => {
-                        topClientesData.push([
-                            idx + 1,
-                            cliente.nombre,
-                            cliente.totalCompras,
-                            cliente.cantidadCompras,
-                            cliente.ultimaCompra ? cliente.ultimaCompra.toLocaleDateString('es-CO') : 'N/A'
-                        ]);
-                    });
-
-                    const wsTop = XLSX.utils.aoa_to_sheet(topClientesData);
-                    wsTop['!cols'] = [{ wch: 10 }, { wch: 25 }, { wch: 18 }, { wch: 18 }, { wch: 15 }];
-                    XLSX.utils.book_append_sheet(wb, wsTop, 'Top Clientes');
-
-                    // HOJA 4: INGRESOS
-                    const ingresosDetalle = [
-                        ['DETALLE DE INGRESOS'],
-                        [''],
-                        ['Fecha', 'Concepto', 'Categoría', 'Monto']
-                    ];
-
-                    ingresosActual.forEach(i => {
-                        ingresosDetalle.push([
-                            i.fecha ? new Date(i.fecha).toLocaleDateString('es-CO') : '',
-                            i.concepto,
-                            i.categoria || '',
-                            parseFloat(i.monto) || 0
-                        ]);
-                    });
-
-                    const wsIngresos = XLSX.utils.aoa_to_sheet(ingresosDetalle);
-                    wsIngresos['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 15 }];
-                    XLSX.utils.book_append_sheet(wb, wsIngresos, 'Ingresos');
-
-                    // HOJA 5: EGRESOS
-                    const egresosDetalle = [
-                        ['DETALLE DE EGRESOS'],
-                        [''],
-                        ['Fecha', 'Concepto', 'Categoría', 'Monto']
-                    ];
-
-                    egresosActual.forEach(e => {
-                        egresosDetalle.push([
-                            e.fecha ? new Date(e.fecha).toLocaleDateString('es-CO') : '',
-                            e.concepto,
-                            e.categoria || '',
-                            parseFloat(e.monto) || 0
-                        ]);
-                    });
-
-                    const wsEgresos = XLSX.utils.aoa_to_sheet(egresosDetalle);
-                    wsEgresos['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 15 }];
-                    XLSX.utils.book_append_sheet(wb, wsEgresos, 'Egresos');
-
-                    // Descargar archivo
-                    const nombreArchivo = `Reporte_Arepas_${desde.toISOString().split('T')[0]}_a_${hasta.toISOString().split('T')[0]}.xlsx`;
-                    XLSX.writeFile(wb, nombreArchivo);
-
-                    pushToast('📊 Reporte Excel descargado con éxito');
-
-                } catch (error) {
-                    console.error('Error generando Excel:', error);
-                    pushToast('Error al generar reporte', 'error');
-                } finally {
-                    setIsLoading(false);
-                }
-            };
+          
+       
 
             // Calcular top clientes
             const calcularTopClientes = () => {
@@ -1228,11 +979,7 @@
                         pushToast('📍 Resumen', 'success');
                     }
 
-                    // Alt + E = Generar Excel
-                    if (e.altKey && e.key === 'e') {
-                        e.preventDefault();
-                        setMostrarModalExcel(true);
-                    }
+               
 
                     // Esc = Cerrar modales
                     if (e.key === 'Escape') {
@@ -1271,43 +1018,38 @@
                 if (session?.user) await loadData();
                 setLoading(false);
             };
-
-            const loadData = async () => {
+const loadData = async () => {
                 setIsLoading(true);
                 try {
-                    const { data: cl } = await supabaseClient.from('clientes').select('*').order('created_at', { ascending: false });
-                    const { data: vs, error: errorVentas } = await supabaseClient.from('ventas').select('*, clientes(nombre)').eq('archivado', false).order('fecha', { ascending: false });
-                    if (errorVentas) {
-                        console.error('Error cargando ventas:', errorVentas);
-                        pushToast('Error al cargar ventas', 'error');
-                    }
-                    const { data: ing } = await supabaseClient.from('ingresos').select('*').eq('archivado', false).order('fecha', { ascending: false });
-                    const { data: egr } = await supabaseClient.from('egresos').select('*').eq('archivado', false).order('fecha', { ascending: false });
-                    const { data: notas } = await supabaseClient.from('notas_calendario').select('*').order('fecha', { ascending: true });
-                    console.log('📅 Notas cargadas:', notas); // TEMPORAL para debug
-                    setNotasCalendario(notas || []);
-                    const { data: comp } = await supabaseClient.from('compras_materia_prima').select('*').order('fecha', { ascending: false });
-                    setCompras(comp || []);
+                    const [
+                        { data: cl },
+                        { data: vs, error: errorVentas },
+                        { data: ing },
+                        { data: egr },
+                        { data: notas },
+                        { data: comp },
+                        { data: config },
+                        { data: hist }
+                    ] = await Promise.all([
+                        supabaseClient.from('clientes').select('*').order('created_at', { ascending: false }),
+                        supabaseClient.from('ventas').select('*, clientes(nombre)').eq('archivado', false).order('fecha', { ascending: false }),
+                        supabaseClient.from('ingresos').select('*').eq('archivado', false).order('fecha', { ascending: false }),
+                        supabaseClient.from('egresos').select('*').eq('archivado', false).order('fecha', { ascending: false }),
+                        supabaseClient.from('notas_calendario').select('*').order('fecha', { ascending: true }),
+                        supabaseClient.from('compras_materia_prima').select('*').order('fecha', { ascending: false }),
+                        supabaseClient.from('configuracion_sistema').select('*').eq('clave', 'fecha_ultimo_reinicio').single(),
+                        supabaseClient.from('historial_resumenes').select('*').order('created_at', { ascending: false })
+                    ]);
+
+                    if (errorVentas) pushToast('Error al cargar ventas', 'error');
+
                     setClientes(cl || []);
                     setVentas(vs || []);
                     setIngresos(ing || []);
                     setEgresos(egr || []);
-                    // Cargar fecha del último reinicio
-                    const { data: config } = await supabaseClient
-                        .from('configuracion_sistema')
-                        .select('*')
-                        .eq('clave', 'fecha_ultimo_reinicio')
-                        .single();
-
-                    if (config && config.valor) {
-                        setFechaUltimoReinicio(config.valor);
-                    }
-
-                    // Cargar historial de resúmenes
-                    const { data: hist } = await supabaseClient
-                        .from('historial_resumenes')
-                        .select('*')
-                        .order('created_at', { ascending: false });
+                    setNotasCalendario(notas || []);
+                    setCompras(comp || []);
+                    if (config?.valor) setFechaUltimoReinicio(config.valor);
                     setHistorialResumenes(hist || []);
                 } catch (err) {
                     console.error(err);
@@ -1893,12 +1635,7 @@
                                 </div>
                             </div>
                             <div className="flex gap-1 md:gap-2 flex-wrap justify-end w-full md:w-auto">
-                                <button
-                                    onClick={() => setMostrarModalExcel(true)}
-                                    className="hidden md:block bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm text-sm"
-                                    title="Generar reporte Excel (Alt + E)">
-                                    📊 Excel
-                                </button>
+                            
                                 <button
                                     onClick={() => setShowCalculadora(true)}
                                     className="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm text-sm"
@@ -2010,14 +1747,7 @@
                                                 <div className={`my-2 border-t ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}></div>
 
                                                 {/* Opciones adicionales */}
-                                                <button
-                                                    onClick={() => {
-                                                        setMostrarModalExcel(true);
-                                                        setShowMenu(false);
-                                                    }}
-                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
-                                                    <span>📊</span> Generar Excel
-                                                </button>
+                                             
 
                                                 {/* Separador */}
                                                 <div className={`my-2 border-t ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}></div>
@@ -2862,7 +2592,10 @@
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <input type="date" value={ventaForm.fecha} onChange={(e) => setVentaForm({ ...ventaForm, fecha: e.target.value })} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                           <div className="relative">
+                                                <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📅 Fecha de la venta</label>
+                                                <input type="date" value={ventaForm.fecha} onChange={(e) => setVentaForm({ ...ventaForm, fecha: e.target.value })} className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            </div>
                                             <input value={ventaForm.notas} onChange={(e) => setVentaForm({ ...ventaForm, notas: e.target.value })} placeholder="Notas" className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
                                         </div>
 
@@ -2956,7 +2689,7 @@
                                                 return b.key.localeCompare(a.key);
                                             });
                                             return gruposOrdenados.map(grupo => {
-                                                const abierto = fechasAbiertas[grupo.key] !== false;
+                                                const abierto = fechasAbiertas[grupo.key] === true;
                                                 const totalGrupo = grupo.ventas.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
                                                 const pendientesGrupo = grupo.ventas.filter(v => v.estado_pago === 'Pendiente').length;
                                                 return (
@@ -4121,7 +3854,7 @@
                     {/* Modal Configuración de Precios */}
                     {mostrarConfigPrecios && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setMostrarConfigPrecios(false)}>
-                            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-2xl max-w-md w-full scale-in`} onClick={(e) => e.stopPropagation()}>
+                           <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-8 rounded-2xl shadow-2xl max-w-sm w-full scale-in`} onClick={(e) => e.stopPropagation()}>
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-2xl font-bold flex items-center gap-2">
                                         <span>💰</span> Configurar Precios
@@ -4129,38 +3862,37 @@
                                     <button onClick={() => setMostrarConfigPrecios(false)} className="text-3xl hover:text-red-500 transition">×</button>
                                 </div>
 
-                                <div className="space-y-6">
-                                    <div className={`${darkMode ? 'bg-gray-700' : 'bg-blue-50'} p-6 rounded-xl border-2 border-blue-300`}>
-                                        <label className="block font-bold text-blue-700 mb-3">🌽 Precio por Unidad</label>
+                             <div className="space-y-3">
+                                    <div className={`${darkMode ? 'bg-gray-700' : 'bg-blue-50'} p-3 rounded-xl border-2 border-blue-300`}>
+                                        <label className="block font-bold text-blue-700 mb-2 text-sm">🌽 Precio por Unidad</label>
                                         <div className="flex gap-2 items-center">
-                                            <span className="text-2xl">$</span>
+                                            <span className="text-lg">$</span>
                                             <input
                                                 type="number"
-                                                value={precioUnidad}
+                                                value={precioUnidad || ''}
+                                                placeholder="0"
                                                 onChange={(e) => setPrecioUnidad(parseFloat(e.target.value) || 0)}
-                                                className="flex-1 p-4 border-2 border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-2xl font-bold text-center"
+                                                className={`flex-1 p-2 border-2 border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-lg font-bold text-center ${darkMode ? 'bg-gray-600 text-white' : 'bg-white'}`}
                                             />
                                         </div>
-                                        <p className="text-sm text-gray-600 mt-2">Este será el precio sugerido para ventas individuales</p>
                                     </div>
 
-                                    <div className={`${darkMode ? 'bg-gray-700' : 'bg-purple-50'} p-6 rounded-xl border-2 border-purple-300`}>
-                                        <label className="block font-bold text-purple-700 mb-3">📦 Precio por Paquete (10 unidades)</label>
+                                    <div className={`${darkMode ? 'bg-gray-700' : 'bg-purple-50'} p-3 rounded-xl border-2 border-purple-300`}>
+                                        <label className="block font-bold text-purple-700 mb-2 text-sm">📦 Precio por Paquete (10 und)</label>
                                         <div className="flex gap-2 items-center">
-                                            <span className="text-2xl">$</span>
+                                            <span className="text-lg">$</span>
                                             <input
                                                 type="number"
-                                                value={precioPaquete}
+                                                value={precioPaquete || ''}
+                                                placeholder="0"
                                                 onChange={(e) => setPrecioPaquete(parseFloat(e.target.value) || 0)}
-                                                className="flex-1 p-4 border-2 border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-2xl font-bold text-center"
+                                                className={`flex-1 p-2 border-2 border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 text-lg font-bold text-center ${darkMode ? 'bg-gray-600 text-white' : 'bg-white'}`}
                                             />
                                         </div>
-                                        <p className="text-sm text-gray-600 mt-2">Este será el precio sugerido para paquetes de 10</p>
                                         <p className="text-xs text-purple-600 mt-1 font-semibold">
-                                            Precio por unidad en paquete: {formatCOP(precioPaquete / 10)}
+                                            Por unidad: {formatCOP(precioPaquete / 10)}
                                         </p>
                                     </div>
-
                                     <div className={`${darkMode ? 'bg-gray-700' : 'bg-green-50'} p-4 rounded-xl border-2 border-green-300`}>
                                         <p className="text-sm text-green-700 font-semibold">💡 Ejemplo de uso:</p>
                                         <ul className="text-sm text-gray-700 mt-2 space-y-1">
@@ -4179,85 +3911,7 @@
                             </div>
                         </div>
                     )}
-                    {/* Modal Generar Excel */}
-                    {mostrarModalExcel && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setMostrarModalExcel(false)}>
-                            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-2xl max-w-md w-full scale-in`} onClick={(e) => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-2xl font-bold flex items-center gap-2">
-                                        <span>📊</span> Generar Reporte Excel
-                                    </h3>
-                                    <button onClick={() => setMostrarModalExcel(false)} className="text-3xl hover:text-red-500 transition">×</button>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div className={`${darkMode ? 'bg-gray-700' : 'bg-blue-50'} p-6 rounded-xl border-2 border-blue-300`}>
-                                        <p className="text-sm text-blue-700 mb-4 font-semibold">
-                                            📅 Selecciona el rango de fechas para el reporte
-                                        </p>
-                                        <p className="text-xs text-gray-600 mb-4">
-                                            Se generará una comparación automática con el mes anterior
-                                        </p>
-
-                                        <div className="space-y-3">
-                                            <div>
-                                                <label className="block text-sm font-semibold mb-2">Desde:</label>
-                                                <input
-                                                    type="date"
-                                                    value={fechaDesdeExcel}
-                                                    onChange={(e) => setFechaDesdeExcel(e.target.value)}
-                                                    className="w-full p-3 border-2 border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-semibold mb-2">Hasta:</label>
-                                                <input
-                                                    type="date"
-                                                    value={fechaHastaExcel}
-                                                    onChange={(e) => setFechaHastaExcel(e.target.value)}
-                                                    className="w-full p-3 border-2 border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {fechaDesdeExcel && fechaHastaExcel && (
-                                            <div className="mt-4 p-3 bg-green-100 rounded-lg">
-                                                <p className="text-xs text-green-700 font-semibold">
-                                                    ✅ Se comparará con el período anterior:
-                                                </p>
-                                                <p className="text-xs text-green-600 mt-1">
-                                                    {(() => {
-                                                        const desde = new Date(fechaDesdeExcel);
-                                                        const hasta = new Date(fechaHastaExcel);
-                                                        const anteriorDesde = new Date(desde);
-                                                        anteriorDesde.setMonth(anteriorDesde.getMonth() - 1);
-                                                        const anteriorHasta = new Date(hasta);
-                                                        anteriorHasta.setMonth(anteriorHasta.getMonth() - 1);
-                                                        return `${anteriorDesde.toLocaleDateString('es-CO')} - ${anteriorHasta.toLocaleDateString('es-CO')}`;
-                                                    })()}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={generarReporteExcel}
-                                            disabled={!fechaDesdeExcel || !fechaHastaExcel}
-                                            className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-4 rounded-xl font-bold hover:from-green-600 hover:to-green-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                                            📥 Descargar Excel
-                                        </button>
-                                        <button
-                                            onClick={() => setMostrarModalExcel(false)}
-                                            className="px-6 bg-gray-400 text-white py-4 rounded-xl font-bold hover:bg-gray-500 transition">
-                                            ❌
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+               
                     {/* Botón Volver Arriba */}
                     <button
                         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
