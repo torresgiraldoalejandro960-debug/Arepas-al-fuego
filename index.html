@@ -1798,69 +1798,69 @@ const loadData = async () => {
                         {activeTab === 'dashboard' && (
                             <div className="space-y-6 fade-in">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition pulse-hover">
-                                        <div className="flex justify-between items-start mb-4">
+                                <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 md:p-6 rounded-2xl shadow-xl transition">
+                                        <div className="flex justify-between items-start mb-2 md:mb-4">
                                             <div>
-                                                <p className="text-blue-100 text-sm font-medium">Clientes Activos</p>
-                                                <p className="text-4xl font-bold mt-2">{clientes.filter(c => c.activo !== false).length}</p>
+                                                <p className="text-blue-100 text-xs md:text-sm font-medium">Clientes Activos</p>
+                                                <p className="text-2xl md:text-4xl font-bold mt-1 md:mt-2">{clientes.filter(c => c.activo !== false).length}</p>
                                             </div>
-                                            <span className="text-5xl opacity-80">👥</span>
+                                            <span className="text-3xl md:text-5xl opacity-80">👥</span>
                                         </div>
                                         <div className="text-xs text-blue-100">{clientes.filter(c => c.tipo_cliente === 'Contrato').length} contratos</div>
                                     </div>
 
-                                    <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition pulse-hover">
-                                        <div className="flex justify-between items-start mb-4">
+                                    <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 md:p-6 rounded-2xl shadow-xl transition">
+                                        <div className="flex justify-between items-start mb-2 md:mb-4">
                                             <div>
-                                                <p className="text-green-100 text-sm font-medium">Ingresos</p>
-                                                <p className="text-2xl font-bold mt-2">{formatCOP(totalIngresosGlobal)}</p>
+                                                <p className="text-green-100 text-xs md:text-sm font-medium">Ingresos</p>
+                                                <p className="text-lg md:text-2xl font-bold mt-1 md:mt-2">{formatCOP(totalIngresosGlobal)}</p>
                                             </div>
-                                            <span className="text-5xl opacity-80">💵</span>
+                                            <span className="text-3xl md:text-5xl opacity-80">💵</span>
                                         </div>
                                         <div className="text-xs text-green-100">{ingresos.length} registros</div>
                                     </div>
 
-                                    <div className="bg-gradient-to-br from-amber-500 to-orange-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition pulse-hover">
-                                        <div className="flex justify-between items-start mb-4">
+                                    <div className="bg-gradient-to-br from-amber-500 to-orange-600 text-white p-4 md:p-6 rounded-2xl shadow-xl transition">
+                                        <div className="flex justify-between items-start mb-2 md:mb-4">
                                             <div>
-                                                <p className="text-amber-100 text-sm font-medium">Balance</p>
-                                                <p className="text-2xl font-bold mt-2">{formatCOP(balanceGlobal)}</p>
+                                                <p className="text-amber-100 text-xs md:text-sm font-medium">Balance</p>
+                                                <p className="text-lg md:text-2xl font-bold mt-1 md:mt-2">{formatCOP(balanceGlobal)}</p>
                                             </div>
-                                            <span className="text-5xl opacity-80">💰</span>
+                                            <span className="text-3xl md:text-5xl opacity-80">💰</span>
                                         </div>
                                         <div className="text-xs text-amber-100">Total neto</div>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-2xl shadow-xl border-l-8 border-orange-500`}>
-                                        <h3 className={`text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}><span>📊</span> Resumen de Ventas</h3>
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between p-4 bg-orange-50 rounded-xl">
-                                                <span className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-900'}`}>Total Ventas</span>
-                                                <span className="font-bold text-orange-600">{formatCOP(ventas.reduce((s, v) => s + (parseFloat(v.total) || 0), 0))}</span>
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-l-8 border-orange-500`}>
+                                        <h3 className={`text-base md:text-xl font-bold mb-3 md:mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}><span>📊</span> Resumen de Ventas</h3>
+                                        <div className="space-y-2">
+                                            <div className={`flex justify-between p-3 ${darkMode ? 'bg-orange-900/40' : 'bg-orange-50'} rounded-xl`}>
+                                                <span className={`font-medium text-sm ${darkMode ? 'text-orange-200' : 'text-gray-900'}`}>Total Ventas</span>
+                                                <span className="font-bold text-orange-500 text-sm">{formatCOP(ventas.reduce((s, v) => s + (parseFloat(v.total) || 0), 0))}</span>
                                             </div>
-                                            <div className="flex justify-between p-4 bg-green-50 rounded-xl">
-                                                <span className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-900'}`}>Pagadas</span>
-                                                <span className="font-bold text-green-600">{formatCOP(ventas.filter(v => v.estado_pago === 'Pagado').reduce((s, v) => s + (parseFloat(v.total) || 0), 0))}</span>
+                                            <div className={`flex justify-between p-3 ${darkMode ? 'bg-green-900/40' : 'bg-green-50'} rounded-xl`}>
+                                                <span className={`font-medium text-sm ${darkMode ? 'text-green-200' : 'text-gray-900'}`}>Pagadas</span>
+                                                <span className="font-bold text-green-500 text-sm">{formatCOP(ventas.filter(v => v.estado_pago === 'Pagado').reduce((s, v) => s + (parseFloat(v.total) || 0), 0))}</span>
                                             </div>
-                                            <div className="flex justify-between p-4 bg-red-50 rounded-xl">
-                                                <span className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-900'}`}>Pendientes</span>
-                                                <span className="font-bold text-red-600">{formatCOP(ventasPendientes)}</span>
+                                            <div className={`flex justify-between p-3 ${darkMode ? 'bg-red-900/40' : 'bg-red-50'} rounded-xl`}>
+                                                <span className={`font-medium text-sm ${darkMode ? 'text-red-200' : 'text-gray-900'}`}>Pendientes</span>
+                                                <span className="font-bold text-red-500 text-sm">{formatCOP(ventasPendientes)}</span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-2xl shadow-xl border-l-8 border-blue-500`}>
-                                        <h3 className={`text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}><span>⏳</span> Pagos Pendientes</h3>
-                                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-l-8 border-blue-500`}>
+                                        <h3 className={`text-base md:text-xl font-bold mb-3 md:mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}><span>⏳</span> Pagos Pendientes</h3>
+                                        <div className="space-y-2 max-h-48 md:max-h-64 overflow-y-auto">
                                             {ventas.filter(v => v.estado_pago === 'Pendiente').slice(0, 6).map(v => (
-                                                <div key={v.id} className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl hover:bg-yellow-100 transition">
+                                                <div key={v.id} className={`flex justify-between items-center p-2 md:p-3 ${darkMode ? 'bg-yellow-900/30' : 'bg-yellow-50'} rounded-xl transition`}>
                                                     <div>
-                                                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>{v.clientes?.nombre}</p>
+                                                        <p className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>{v.clientes?.nombre}</p>
                                                         <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{v.cantidad} {v.tipo_cantidad}</p>
                                                     </div>
-                                                    <span className="font-bold text-red-600">{formatCOP((parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0))}</span>
+                                                    <span className="font-bold text-red-500 text-sm">{formatCOP((parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0))}</span>
                                                 </div>
                                             ))}
                                             {ventas.filter(v => v.estado_pago === 'Pendiente').length === 0 && <p className="text-center py-8 text-gray-400">✅ Todo al día</p>}
@@ -1869,33 +1869,29 @@ const loadData = async () => {
                                 </div>
 
                                 {/* Top 5 Clientes y Cliente del Mes */}
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                                     {/* Top 5 Clientes */}
-                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-2xl shadow-xl border-l-8 border-purple-500`}>
-                                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-l-8 border-purple-500`}>
+                                        <h3 className={`text-base md:text-xl font-bold mb-3 md:mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                                             <span>🏆</span> Top 5 Mejores Clientes
                                         </h3>
                                         <div className="space-y-2">
                                             {calcularTopClientes().slice(0, 5).map((cliente, idx) => (
-                                                <div key={cliente.id} className={`flex justify-between items-center p-4 ${darkMode ? 'bg-gray-700' : idx === 0 ? 'bg-gradient-to-r from-yellow-100 to-yellow-200 border-2 border-yellow-400' : 'bg-purple-50'} rounded-xl hover:shadow-md transition`}>
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-2xl font-bold text-purple-600">#{idx + 1}</span>
+                                                <div key={cliente.id} className={`flex justify-between items-center p-2 md:p-4 ${darkMode ? idx === 0 ? 'bg-yellow-900/40 border border-yellow-600' : 'bg-gray-700' : idx === 0 ? 'bg-gradient-to-r from-yellow-100 to-yellow-200 border-2 border-yellow-400' : 'bg-purple-50'} rounded-xl transition`}>
+                                                    <div className="flex items-center gap-2 md:gap-3">
+                                                        <span className="text-base md:text-2xl font-bold text-purple-500">#{idx + 1}</span>
                                                         <div>
-                                                            <p className={`font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                                                            <p className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>
                                                                 {idx === 0 && '👑 '}{cliente.nombre}
                                                             </p>
-                                                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                                                                 {cliente.cantidadCompras} compra{cliente.cantidadCompras !== 1 ? 's' : ''}
                                                             </p>
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <p className="font-bold text-green-600 text-lg">{formatCOP(cliente.totalCompras)}</p>
-                                                        <button
-                                                            onClick={() => abrirPerfilCliente(cliente)}
-                                                            className="text-xs text-blue-600 hover:underline mt-1">
-                                                            Ver perfil →
-                                                        </button>
+                                                        <p className="font-bold text-green-500 text-sm">{formatCOP(cliente.totalCompras)}</p>
+                                                        <button onClick={() => abrirPerfilCliente(cliente)} className="text-xs text-blue-400 hover:underline mt-1">Ver perfil →</button>
                                                     </div>
                                                 </div>
                                             ))}
@@ -1906,21 +1902,21 @@ const loadData = async () => {
                                     </div>
 
                                     {/* Cliente del Mes */}
-                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-2xl shadow-xl border-l-8 border-orange-500`}>
-                                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-l-8 border-orange-500`}>
+                                        <h3 className={`text-base md:text-xl font-bold mb-3 md:mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                                             <span>⭐</span> Cliente del Mes
                                         </h3>
                                         {(() => {
                                             const clienteMes = calcularClienteDelMes();
                                             return clienteMes ? (
-                                                <div className="bg-gradient-to-r from-orange-100 to-yellow-100 p-6 rounded-2xl border-2 border-orange-300 text-center">
-                                                    <div className="text-6xl mb-4">🎉</div>
-                                                    <h4 className="text-2xl font-bold text-orange-800 mb-2">{clienteMes.cliente?.nombre}</h4>
-                                                    <p className="text-lg font-bold text-green-600 mb-2">{formatCOP(clienteMes.total)}</p>
-                                                    <p className="text-sm text-gray-700">{clienteMes.cantidad} compra{clienteMes.cantidad !== 1 ? 's' : ''} este mes</p>
+                                           <div className={`${darkMode ? 'bg-orange-900/30 border-orange-700' : 'bg-gradient-to-r from-orange-100 to-yellow-100 border-orange-300'} p-4 md:p-6 rounded-2xl border-2 text-center`}>
+                                                    <div className="text-4xl md:text-6xl mb-2 md:mb-4">🎉</div>
+                                                    <h4 className={`text-lg md:text-2xl font-bold mb-1 md:mb-2 ${darkMode ? 'text-orange-300' : 'text-orange-800'}`}>{clienteMes.cliente?.nombre}</h4>
+                                                    <p className="text-base md:text-lg font-bold text-green-500 mb-1 md:mb-2">{formatCOP(clienteMes.total)}</p>
+                                                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-700'}`}>{clienteMes.cantidad} compra{clienteMes.cantidad !== 1 ? 's' : ''} este mes</p>
                                                     <button
                                                         onClick={() => abrirPerfilCliente(clienteMes.cliente)}
-                                                        className="mt-4 px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-bold">
+                                                        className="mt-3 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-bold text-sm">
                                                         Ver Perfil
                                                     </button>
                                                 </div>
@@ -2644,12 +2640,12 @@ const loadData = async () => {
                                             })()}
                                         </div>
                                     )}
-                                    {ventasSeleccionadas.size > 0 && (
-                                        <div className={`flex flex-wrap items-center gap-2 p-2 rounded-xl mb-4 border-2 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-300'}`}>
-                                            <span className={`font-bold text-xs ${darkMode ? 'text-white' : 'text-blue-800'}`}>☑️ {ventasSeleccionadas.size}</span>
-                                            <button onClick={abrirDuplicar} className="px-2 py-1 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 transition">📋 Duplicar</button>
-                                            <button onClick={eliminarSeleccionadas} className="px-2 py-1 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition">🗑️ Eliminar</button>
-                                            <button onClick={limpiarSeleccion} className={`px-2 py-1 rounded-lg text-xs font-medium transition ${darkMode ? 'bg-gray-600 text-white hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>✕</button>
+                                   {ventasSeleccionadas.size > 0 && (
+                                        <div className={`flex flex-wrap items-center gap-2 p-2 rounded-xl mb-4 border-2 ${darkMode ? 'bg-gray-800 border-purple-700' : 'bg-blue-50 border-blue-300'}`}>
+                                            <span className={`font-bold text-xs ${darkMode ? 'text-purple-300' : 'text-blue-800'}`}>☑️ {ventasSeleccionadas.size}</span>
+                                            <button onClick={abrirDuplicar} className={`px-2 py-1 rounded-lg text-xs font-bold transition ${darkMode ? 'bg-purple-700 hover:bg-purple-600 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}>📋 Duplicar</button>
+                                            <button onClick={eliminarSeleccionadas} className={`px-2 py-1 rounded-lg text-xs font-bold transition ${darkMode ? 'bg-red-800 hover:bg-red-700 text-red-200' : 'bg-red-600 hover:bg-red-700 text-white'}`}>🗑️ Eliminar</button>
+                                            <button onClick={limpiarSeleccion} className={`px-2 py-1 rounded-lg text-xs font-medium transition ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>✕</button>
                                         </div>
                                     )}
                                <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -2689,8 +2685,17 @@ const loadData = async () => {
                                             });
                                             return gruposOrdenados.map(grupo => {
                                                 const abierto = fechasAbiertas[grupo.key] === true;
-                                                const totalGrupo = grupo.ventas.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
+                                              const totalGrupo = grupo.ventas.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
                                                 const pendientesGrupo = grupo.ventas.filter(v => v.estado_pago === 'Pendiente').length;
+                                                const paquetesGrupo = grupo.ventas.reduce((s, v) => {
+                                                    if (v.tipo_cantidad === 'Paquetes') return s + (parseInt(v.cantidad) || 0);
+                                                    if (v.tipo_cantidad === 'Unidades') return s + Math.floor((parseInt(v.cantidad) || 0) / 10);
+                                                    return s;
+                                                }, 0);
+                                                const unidadesSueltas = grupo.ventas.reduce((s, v) => {
+                                                    if (v.tipo_cantidad === 'Unidades') return s + ((parseInt(v.cantidad) || 0) % 10);
+                                                    return s;
+                                                }, 0);
                                                 return (
                                                     <div key={grupo.key} className={`rounded-xl border-2 overflow-hidden ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
                                                         {/* Encabezado fecha - clic para abrir/cerrar */}
@@ -2699,12 +2704,12 @@ const loadData = async () => {
                                                             className={`w-full flex items-center justify-between p-3 md:p-4 text-left transition ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'}`}>
                                                             <div className="flex items-center gap-2 md:gap-3 flex-wrap">
                                                                 <span className="text-base md:text-lg font-bold capitalize">{grupo.label}</span>
-                                                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-white text-gray-600'}`}>
-                                                                    {grupo.ventas.length} venta{grupo.ventas.length !== 1 ? 's' : ''}
+                                                               <span className={`text-xs px-2 py-1 rounded-full font-medium ${darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'}`}>
+                                                                    📦 {grupo.ventas.reduce((s, v) => { if (v.tipo_cantidad === 'Paquetes') return s + (parseInt(v.cantidad) || 0); if (v.tipo_cantidad === 'Unidades') return s + Math.floor((parseInt(v.cantidad) || 0) / 10); return s; }, 0)} paq{grupo.ventas.reduce((s, v) => v.tipo_cantidad === 'Unidades' ? s + ((parseInt(v.cantidad) || 0) % 10) : s, 0) > 0 ? ` + ${grupo.ventas.reduce((s, v) => v.tipo_cantidad === 'Unidades' ? s + ((parseInt(v.cantidad) || 0) % 10) : s, 0)} und` : ''}
                                                                 </span>
                                                                 {pendientesGrupo > 0 && (
                                                                     <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-medium">
-                                                                        ⏳ {pendientesGrupo} pendiente{pendientesGrupo !== 1 ? 's' : ''}
+                                                                        ⏳ {pendientesGrupo} pend · {formatCOP(grupo.ventas.filter(v => v.estado_pago === 'Pendiente').reduce((s, v) => s + (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0), 0))}
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -4009,15 +4014,12 @@ const loadData = async () => {
                                                         {clientes.filter(c => c.activo !== false).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                                                     </select>
                                                 </div>
-                                                <div>
+                                        <div>
                                                     <label className="text-xs font-semibold mb-1 block">Cantidad</label>
                                                     <input type="number" min="1" value={v._editCantidad}
-                                                        onChange={e => {
-                                                            const cant = parseInt(e.target.value) || 1;
-                                                            const precio = parseFloat(v._editPrecioUnitario) || 0;
-                                                            setModalDuplicar(prev => prev.map((x, i) => i === idx ? { ...x, _editCantidad: cant, _editTotal: precio > 0 ? cant * precio : x._editTotal } : x));
-                                                        }}
-                                                        className={`w-full p-2 border-2 rounded-lg text-xs ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`} />
+                                                        onChange={e => setModalDuplicar(prev => prev.map((x, i) => i === idx ? { ...x, _editCantidad: e.target.value, _editTotal: parseFloat(v._editPrecioUnitario) > 0 ? (parseFloat(e.target.value) || 0) * parseFloat(v._editPrecioUnitario) : v._editTotal } : x))}
+                                                        onFocus={e => e.target.select()}
+                                                        className={`w-full p-2 border-2 rounded-lg text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`} />
                                                 </div>
                                                 <div>
                                                     <label className="text-xs font-semibold mb-1 block">Precio unitario</label>
