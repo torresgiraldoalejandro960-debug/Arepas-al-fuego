@@ -401,7 +401,7 @@
             );
         }
 
-        function HistorialCompras({ clientes, ventas, pushToast, loadData, supabaseClient, formatCOP, darkMode, enviarWhatsApp }) {
+        function HistorialCompras({ clientes, ventas, pushToast, loadData, supabaseClient, formatCOP, darkMode, enviarWhatsApp, historialAbiertos, toggleHistorial, historialBusqueda, setHistorialBusqueda, historialOrden, setHistorialOrden }) {
             const [selectedCliente, setSelectedCliente] = useState(null);
             const [abonoTotal, setAbonoTotal] = useState('');
 
@@ -486,20 +486,14 @@
                             const nuevoAbono = (parseFloat(venta.abono) || 0) + abonoVenta;
                             const nuevoEstado = nuevoAbono >= parseFloat(venta.total) ? 'Pagado' : 'Pendiente';
 
-                            // Actualizar la venta
                             const { error: errorVenta } = await supabaseClient.from('ventas').update({
                                 abono: nuevoAbono,
                                 estado_pago: nuevoEstado
                             }).eq('id', venta.id);
 
-                            if (errorVenta) {
-                                console.error('Error actualizando venta:', errorVenta);
-                                pushToast('Error al actualizar venta', 'error');
-                                continue;
-                            }
+                            if (errorVenta) { pushToast('Error al actualizar venta', 'error'); continue; }
 
-                            // Registrar el ingreso
-                            const { data: ingresoData, error: errorIngreso } = await supabaseClient.from('ingresos').insert({
+                            const { error: errorIngreso } = await supabaseClient.from('ingresos').insert({
                                 concepto: `Abono - ${deudaInfo.cliente.nombre} [ID:${venta.id}]`,
                                 monto: abonoVenta,
                                 categoria: 'Abono',
@@ -507,14 +501,7 @@
                                 notas: `venta_id:${venta.id}`
                             }).select();
 
-                            if (errorIngreso) {
-                                console.error('Error registrando ingreso:', errorIngreso);
-                                pushToast('Error al registrar ingreso: ' + errorIngreso.message, 'error');
-                            } else {
-                                console.log('✅ Ingreso registrado:', ingresoData);
-                                ventasActualizadas.push({ id: venta.id, monto: abonoVenta });
-                            }
-
+                            if (!errorIngreso) ventasActualizadas.push({ id: venta.id, monto: abonoVenta });
                             montoRestante -= abonoVenta;
                         }
                     }
@@ -534,16 +521,52 @@
                     pushToast('Error al procesar el abono', 'error');
                 }
             };
+
             const deudas = calcularDeudaPorCliente();
-            const clientesConDeuda = Object.values(deudas).sort((a, b) =>
-                a.cliente.nombre.localeCompare(b.cliente.nombre, 'es', { sensitivity: 'base' })
-            );
+            let clientesConDeuda = Object.values(deudas);
+
+            // Filtrar por búsqueda
+            if (historialBusqueda) {
+                clientesConDeuda = clientesConDeuda.filter(d =>
+                    d.cliente.nombre.toLowerCase().includes(historialBusqueda.toLowerCase())
+                );
+            }
+            // Ordenar
+            clientesConDeuda = clientesConDeuda.sort((a, b) => {
+                if (historialOrden === 'az') return a.cliente.nombre.localeCompare(b.cliente.nombre, 'es', { sensitivity: 'base' });
+                if (historialOrden === 'za') return b.cliente.nombre.localeCompare(a.cliente.nombre, 'es', { sensitivity: 'base' });
+                if (historialOrden === 'mayor') return b.totalDeuda - a.totalDeuda;
+                if (historialOrden === 'menor') return a.totalDeuda - b.totalDeuda;
+                return 0;
+            });
+
             return (
-                <div className="space-y-6 fade-in">
-                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-purple-500`}>
-                        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                            <span>📋</span> Historial de Compras y Deudas por Fecha
+                <div className="space-y-4 fade-in">
+                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-t-8 border-purple-500`}>
+                        <h2 className="text-lg md:text-2xl font-bold mb-4 flex items-center gap-2">
+                            <span>📋</span> Historial de Deudas ({clientesConDeuda.length})
                         </h2>
+                        {/* Filtros */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                            <input
+                                type="text"
+                                value={historialBusqueda}
+                                onChange={e => setHistorialBusqueda(e.target.value)}
+                                placeholder="🔍 Buscar cliente..."
+                                className={`p-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`}
+                            />
+                            <select value={historialOrden} onChange={e => setHistorialOrden(e.target.value)}
+                                className={`p-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`}>
+                                <option value="az">🔤 A → Z</option>
+                                <option value="za">🔤 Z → A</option>
+                                <option value="mayor">💰 Mayor deuda</option>
+                                <option value="menor">💰 Menor deuda</option>
+                            </select>
+                            <button onClick={() => { setHistorialBusqueda(''); setHistorialOrden('az'); }}
+                                className={`p-3 rounded-xl font-semibold text-sm transition ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}>
+                                🔄 Limpiar
+                            </button>
+                        </div>
 
                         {clientesConDeuda.length === 0 ? (
                             <div className="text-center py-12">
@@ -551,41 +574,42 @@
                                 <p className="text-xl text-gray-600 font-semibold">¡No hay deudas pendientes!</p>
                             </div>
                         ) : (
-                            <div className="space-y-6">
-                                {clientesConDeuda.map(deudaInfo => (
-                                    <div key={deudaInfo.cliente.id} className={`border-2 ${darkMode ? 'border-gray-600 bg-gray-750' : 'border-gray-200 bg-white'} rounded-xl p-3 md:p-6 hover:border-orange-300 transition`}>
-                                        <div className="flex justify-between items-start mb-4">
+                            <div className="space-y-3">
+                                {clientesConDeuda.map(deudaInfo => {
+                                    const abierto = historialAbiertos[deudaInfo.cliente.id] === true;
+                                    return (
+                                    <div key={deudaInfo.cliente.id} className={`border-2 ${darkMode ? 'border-gray-600' : 'border-gray-200'} rounded-xl overflow-hidden`}>
+                                        {/* Header colapsable */}
+                                        <button onClick={() => toggleHistorial(deudaInfo.cliente.id)}
+                                            className={`w-full flex justify-between items-center p-3 md:p-4 text-left transition ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'}`}>
                                             <div>
-                                                <h3 className={`text-base md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>{deudaInfo.cliente.nombre}</h3>
-                                                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Debe en {deudaInfo.cantidadFechas} fecha(s)</p>
+                                                <p className={`font-bold text-sm md:text-base ${darkMode ? 'text-white' : 'text-gray-800'}`}>{deudaInfo.cliente.nombre}</p>
+                                                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{deudaInfo.cantidadFechas} fecha(s) pendiente(s)</p>
                                             </div>
-                                            <div className="text-right">
-                                                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Total Deuda</p>
-                                                <p className="text-lg md:text-3xl font-bold text-red-600">{formatCOP(deudaInfo.totalDeuda)}</p>
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-bold text-red-500 text-sm md:text-base">{formatCOP(deudaInfo.totalDeuda)}</span>
+                                                <span className={`text-lg transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`}>▼</span>
                                             </div>
-                                        </div>
-
+                                        </button>
+                                        {/* Detalle */}
+                                        {abierto && (
+                                        <div className="p-3 md:p-4 space-y-3">
                                         <div className="space-y-3 mb-4">
                                             {deudaInfo.fechas.map((fechaInfo, idx) => (
                                                 <div key={idx} className={`${darkMode ? 'bg-red-900/30' : 'bg-red-50'} p-2 md:p-4 rounded-lg border-l-4 border-red-500`}>
                                                     <div className="flex justify-between items-center mb-2">
-                                                        <span className={`font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>📅 {fechaInfo.fecha}</span>
-                                                        <span className="font-bold text-red-600">{formatCOP(fechaInfo.deuda)}</span>
+                                                        <span className={`font-semibold text-sm ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>📅 {fechaInfo.fecha}</span>
+                                                        <span className="font-bold text-red-600 text-sm">{formatCOP(fechaInfo.deuda)}</span>
                                                     </div>
-                                                    <div className="space-y-2 mt-3">
+                                                    <div className="space-y-2 mt-2">
                                                         {fechaInfo.ventas.map((venta, vIdx) => (
-                                                            <div key={vIdx} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-2 rounded-lg text-xs md:text-sm`}>
+                                                            <div key={vIdx} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-2 rounded-lg text-xs`}>
                                                                 <div className="flex justify-between items-center">
-                                                                    <div>
-                                                                        <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Semana: </span>
-                                                                        <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{venta.semana || 'N/A'}</span>
-                                                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} ml-3`}>Cantidad: </span>
-                                                                        <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{venta.cantidad} {venta.tipo_cantidad}</span>
-                                                                    </div>
+                                                                    <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{venta.cantidad} {venta.tipo_cantidad}</span>
                                                                     <div className="text-right">
-                                                                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total: {formatCOP(venta.total)}</p>
-                                                                        <p className="text-xs text-blue-600">Abonado: {formatCOP(venta.abono || 0)}</p>
-                                                                        <p className="text-xs text-red-600 font-bold">Debe: {formatCOP((parseFloat(venta.total) || 0) - (parseFloat(venta.abono) || 0))}</p>
+                                                                        <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total: {formatCOP(venta.total)}</p>
+                                                                        <p className="text-blue-500">Abonado: {formatCOP(venta.abono || 0)}</p>
+                                                                        <p className="text-red-500 font-bold">Debe: {formatCOP((parseFloat(venta.total) || 0) - (parseFloat(venta.abono) || 0))}</p>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -601,73 +625,49 @@
                                                     💰 Monto a abonar (se aplicará desde la fecha más antigua)
                                                 </label>
                                                 <div className="flex gap-2">
-                                                    <input
-                                                        type="number"
-                                                        value={abonoTotal}
-                                                        onChange={(e) => setAbonoTotal(e.target.value)}
-                                                        placeholder="Ingresa el monto"
-                                                        className="flex-1 p-3 border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                    <button
-                                                        onClick={handleAbonoTotal}
-                                                        className="px-6 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition">
-                                                        ✅ Aplicar
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { setSelectedCliente(null); setAbonoTotal(''); }}
-                                                        className="px-6 py-3 bg-gray-400 text-white rounded-lg font-bold hover:bg-gray-500 transition">
-                                                        ❌
-                                                    </button>
+                                                    <input type="number" value={abonoTotal} onChange={(e) => setAbonoTotal(e.target.value)} placeholder="Ingresa el monto" className="flex-1 p-3 border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                                    <button onClick={handleAbonoTotal} className="px-4 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition">✅</button>
+                                                    <button onClick={() => { setSelectedCliente(null); setAbonoTotal(''); }} className="px-4 py-3 bg-gray-400 text-white rounded-lg font-bold hover:bg-gray-500 transition">❌</button>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                <button
-                                                    onClick={() => setSelectedCliente(deudaInfo.cliente.id)}
-                                                    className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-lg font-bold hover:from-blue-600 hover:to-blue-700 transition">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button onClick={() => setSelectedCliente(deudaInfo.cliente.id)}
+                                                    className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-lg font-bold hover:from-blue-600 hover:to-blue-700 transition text-sm">
                                                     💰 Abonar
                                                 </button>
-                                                <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            // Preparar el mensaje detallado
-                                                            let mensaje = `Hola ${deudaInfo.cliente.nombre}! 🫓🌽 \n\n`;
-                                                            mensaje += `Te enviamos el detalle de tu saldo pendiente:\n\n`;
-
-                                                            // Agregar detalle por fecha
-                                                            deudaInfo.fechas.forEach(fechaInfo => {
-                                                                mensaje += ` 📅 *${fechaInfo.fecha}*\n`;
-                                                                fechaInfo.ventas.forEach(v => {
-                                                                    const deuda = (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0);
-                                                                    mensaje += `  • ${v.cantidad} ${v.tipo_cantidad} - Debe: ${formatCOP(deuda)}\n`;
-                                                                });
-                                                                mensaje += `\n`;
-                                                            });
-
-                                                            mensaje += `💰  *TOTAL ADEUDADO: ${formatCOP(deudaInfo.totalDeuda)}*\n\n`;
-                                                            mensaje += `¿Cuándo podríamos coordinar el pago? Estamos a tu disposición. ¡Gracias! 😊 \n\n`;
-                                                            mensaje += `ATT: Arepas al Carbon 🫓🌽 `;
-
-                                                            // Llamar a la función
-                                                            await enviarWhatsApp(deudaInfo.cliente, mensaje);
-                                                        } catch (error) {
-                                                            console.error('Error al enviar WhatsApp:', error);
-                                                            pushToast('Error al abrir WhatsApp', 'error');
-                                                        }
-                                                    }}
-                                                    className="bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-lg font-bold hover:from-green-600 hover:to-green-700 transition">
+                                                <button onClick={async () => {
+                                                    let mensaje = `Hola ${deudaInfo.cliente.nombre}! 🫓🌽 \n\n`;
+                                                    mensaje += `Te enviamos el detalle de tu saldo pendiente:\n\n`;
+                                                    deudaInfo.fechas.forEach(fechaInfo => {
+                                                        mensaje += ` 📅 *${fechaInfo.fecha}*\n`;
+                                                        fechaInfo.ventas.forEach(v => {
+                                                            const deuda = (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0);
+                                                            mensaje += `  • ${v.cantidad} ${v.tipo_cantidad} - Debe: ${formatCOP(deuda)}\n`;
+                                                        });
+                                                        mensaje += `\n`;
+                                                    });
+                                                    mensaje += `💰  *TOTAL ADEUDADO: ${formatCOP(deudaInfo.totalDeuda)}*\n\n`;
+                                                    mensaje += `¿Cuándo podríamos coordinar el pago? ¡Gracias! 😊`;
+                                                    await enviarWhatsApp(deudaInfo.cliente, mensaje);
+                                                }}
+                                                    className="bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-lg font-bold hover:from-green-600 hover:to-green-700 transition text-sm">
                                                     📱 WhatsApp
                                                 </button>
                                             </div>
                                         )}
+                                        </div>
+                                        )}
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
                 </div>
             );
         }
+
 
         function App() {
 
@@ -700,6 +700,12 @@
             const limpiarSeleccion = () => setVentasSeleccionadas(new Set());
 
             const [ordenAlfabeticoClientes, setOrdenAlfabeticoClientes] = useState(false);
+            const [mostrarFormCliente, setMostrarFormCliente] = useState(false);
+            const [mostrarFormVenta, setMostrarFormVenta] = useState(false);
+            const [historialAbiertos, setHistorialAbiertos] = useState({});
+            const toggleHistorial = (id) => setHistorialAbiertos(prev => ({ ...prev, [id]: !prev[id] }));
+            const [historialBusqueda, setHistorialBusqueda] = useState('');
+            const [historialOrden, setHistorialOrden] = useState('az');
             const [darkMode, setDarkMode] = useState(false);
             const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
             const [mostrarPerfilCliente, setMostrarPerfilCliente] = useState(false);
@@ -745,6 +751,12 @@
             const [fechaUltimoReinicio, setFechaUltimoReinicio] = useState(null);
             const [historialResumenes, setHistorialResumenes] = useState([]);
             const [mostrarHistorial, setMostrarHistorial] = useState(false);
+            const [inventario, setInventario] = useState([]);
+            const [movimientos, setMovimientos] = useState([]);
+            const [invForm, setInvForm] = useState({ nombre: '', categoria: 'Materia Prima', unidad_compra: 'Bulto', unidad_uso: 'Kg', conversion: '', cantidad_unidades: '1', precio_compra_total: '', fecha: new Date().toISOString().slice(0, 10) });
+            const [salidaForm, setSalidaForm] = useState({ inventario_id: '', cantidad: '', concepto: '', fecha: new Date().toISOString().slice(0, 10) });
+            const [invTab, setInvTab] = useState('stock');
+            const [invSeleccionado, setInvSeleccionado] = useState(null);
 
             const pushToast = (msg, type = 'success') => { const id = Date.now() + Math.random(); const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'; setToasts(t => [...t, { id, message: msg, type, icon }]); setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 5000); };
             // Funciones para modales personalizados
@@ -1030,7 +1042,9 @@ const loadData = async () => {
                         { data: notas },
                         { data: comp },
                         { data: config },
-                        { data: hist }
+                        { data: hist },
+                        { data: inv },
+                        { data: mov }
                     ] = await Promise.all([
                         supabaseClient.from('clientes').select('*').order('created_at', { ascending: false }),
                         supabaseClient.from('ventas').select('*, clientes(nombre)').eq('archivado', false).order('fecha', { ascending: false }),
@@ -1039,7 +1053,9 @@ const loadData = async () => {
                         supabaseClient.from('notas_calendario').select('*').order('fecha', { ascending: true }),
                         supabaseClient.from('compras_materia_prima').select('*').order('fecha', { ascending: false }),
                         supabaseClient.from('configuracion_sistema').select('*').eq('clave', 'fecha_ultimo_reinicio').single(),
-                        supabaseClient.from('historial_resumenes').select('*').order('created_at', { ascending: false })
+                        supabaseClient.from('historial_resumenes').select('*').order('created_at', { ascending: false }),
+                        supabaseClient.from('inventario').select('*').order('created_at', { ascending: false }),
+                        supabaseClient.from('movimientos_inventario').select('*, inventario(nombre, unidad_uso)').order('fecha', { ascending: false })
                     ]);
 
                     if (errorVentas) pushToast('Error al cargar ventas', 'error');
@@ -1052,6 +1068,8 @@ const loadData = async () => {
                     setCompras(comp || []);
                     if (config?.valor) setFechaUltimoReinicio(config.valor);
                     setHistorialResumenes(hist || []);
+                    setInventario(inv || []);
+                    setMovimientos(mov || []);
                 } catch (err) {
                     console.error(err);
                     pushToast('Error cargando datos', 'error');
@@ -1452,12 +1470,30 @@ const loadData = async () => {
 
             const deleteEgreso = async (id) => {
                 if (!confirm('¿Eliminar?')) return;
+                const { data: egreso } = await supabaseClient.from('egresos').select('*').eq('id', id).single();
                 const { error } = await supabaseClient.from('egresos').delete().eq('id', id);
                 if (error) {
-                    console.error('ERROR DELETE EGRESO:', error);
                     pushToast('Error', 'error');
                 } else {
-                    pushToast('Eliminado', 'error');
+                    if (egreso?.categoria === 'Inventario' && egreso?.concepto) {
+                        // Buscar por ID embebido en concepto: [INV:123]
+                        const matchId = egreso.concepto.match(/\[INV:(\d+)\]/);
+                        if (matchId) {
+                            const invId = parseInt(matchId[1]);
+                            await supabaseClient.from('inventario').update({ cantidad_disponible: 0 }).eq('id', invId);
+                            const item = inventario.find(i => i.id === invId);
+                            pushToast('⚠️ Stock de ' + (item?.nombre || 'producto') + ' puesto en 0');
+                        } else {
+                            // Fallback: buscar por nombre (compatibilidad con registros viejos)
+                            const nombre = egreso.concepto.replace('Inventario - ', '').trim();
+                            const item = inventario.find(i => i.nombre === nombre);
+                            if (item) {
+                                await supabaseClient.from('inventario').update({ cantidad_disponible: 0 }).eq('id', item.id);
+                                pushToast('⚠️ Stock de ' + nombre + ' puesto en 0');
+                            }
+                        }
+                    }
+                    pushToast('Egreso eliminado');
                     loadData();
                 }
             };
@@ -1660,7 +1696,7 @@ const loadData = async () => {
                                     <span className="md:hidden">{darkMode ? '🔥' : '☠️'}</span>
                                 </button>
                                 {/* Menú de 3 puntos en móvil */}
-                                <div className="relative md:hidden">
+                                <div className="relative">
                                     <button
                                         onClick={() => setShowMenu(!showMenu)}
                                         className="bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg font-medium transition backdrop-blur-sm text-xl">
@@ -1731,11 +1767,11 @@ const loadData = async () => {
 
                                                 <button
                                                     onClick={() => {
-                                                        setActiveTab('compras');
+                                                        setActiveTab('inventario');
                                                         setShowMenu(false);
                                                     }}
-                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'compras' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
-                                                    <span>🛍️</span> Compras
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'inventario' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>📦</span> Inventario
                                                 </button>
 
                                                 <button
@@ -1777,7 +1813,7 @@ const loadData = async () => {
                             </button>
                         </div>
                     </div>
-                    <div className={`hidden md:flex border-b shadow-lg sticky top-16 z-10 overflow-x-auto scrollbar-hide ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                    <div className={`hidden border-b shadow-lg sticky top-16 z-10 overflow-x-auto scrollbar-hide ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                         {[
                             { id: 'dashboard', label: 'Inicio', icon: '📊' },
                             { id: 'clientes', label: 'Clientes', icon: '👥' },
@@ -1785,7 +1821,7 @@ const loadData = async () => {
                             { id: 'historial', label: 'Historial Compras', icon: '📋' },
                             { id: 'calendario', label: 'Calendario', icon: '📅' },
                             { id: 'contabilidad', label: 'Contabilidad', icon: '💰' },
-                            { id: 'compras', label: 'Compras', icon: '🛒' },
+                            { id: 'inventario', label: 'Inventario', icon: '📦' },
                             { id: 'resumen', label: 'Resumen', icon: '📈' }
                         ].map(tab => (
                             <button key={tab.id} onClick={() => { setActiveTab(tab.id); setFilterDate(''); setFilterEstado('Todos'); }} className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all whitespace-nowrap ${activeTab === tab.id ? darkMode ? 'border-b-4 border-orange-500 text-orange-400 bg-gray-700' : 'border-b-4 border-orange-600 text-orange-600 bg-orange-50' : darkMode ? 'text-gray-300 hover:text-orange-400 hover:bg-gray-700' : 'text-gray-600 hover:text-orange-600 hover:bg-amber-50'}`}>
@@ -2081,9 +2117,14 @@ const loadData = async () => {
 
                         {activeTab === 'clientes' && (
                             <div className="space-y-6 fade-in">
-                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-green-500`}>
-                                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><span>➕</span> Agregar Cliente</h2>
-                                    <form onSubmit={addCliente} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl border-t-8 border-green-500 overflow-hidden`}>
+                                    <button type="button" onClick={() => setMostrarFormCliente(!mostrarFormCliente)}
+                                        className={`w-full flex justify-between items-center p-4 md:p-6 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-green-50'}`}>
+                                        <h2 className="text-lg md:text-2xl font-bold flex items-center gap-2"><span>➕</span> Agregar Cliente</h2>
+                                        <span className={`text-xl transition-transform duration-200 ${mostrarFormCliente ? 'rotate-180' : ''}`}>▼</span>
+                                    </button>
+                                    {mostrarFormCliente && <div className="px-4 pb-4 md:px-8 md:pb-8">
+                                    <form onSubmit={async (e) => { await addCliente(e); setMostrarFormCliente(false); }} className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <input value={clienteForm.nombre} onChange={(e) => setClienteForm({ ...clienteForm, nombre: e.target.value })} placeholder="Nombre completo *" className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent ${darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white border-gray-200"}`} required />
                                         <input value={clienteForm.direccion} onChange={(e) => setClienteForm({ ...clienteForm, direccion: e.target.value })} placeholder="Dirección" className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent ${darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white border-gray-200"}`} />
                                         <select value={clienteForm.tipo_cliente} onChange={(e) => setClienteForm({ ...clienteForm, tipo_cliente: e.target.value })} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent ${darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white border-gray-200"}`}>
@@ -2105,6 +2146,7 @@ const loadData = async () => {
                                         <input value={clienteForm.telefono || ''} onChange={(e) => setClienteForm({ ...clienteForm, telefono: e.target.value })} placeholder="Teléfono (573001234567)" className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent ${darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white border-gray-200"}`} />
                                         <button type="submit" className="md:col-span-3 bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold text-lg hover:from-green-600 hover:to-green-700 transition shadow-lg pulse-hover">✅ Agregar Cliente</button>
                                     </form>
+                                    </div>}
                                 </div>
 
                                 <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-3 md:p-8 rounded-2xl shadow-xl`}>
@@ -2217,6 +2259,12 @@ const loadData = async () => {
                                 formatCOP={formatCOP}
                                 darkMode={darkMode}
                                 enviarWhatsApp={enviarWhatsApp}
+                                historialAbiertos={historialAbiertos}
+                                toggleHistorial={toggleHistorial}
+                                historialBusqueda={historialBusqueda}
+                                setHistorialBusqueda={setHistorialBusqueda}
+                                historialOrden={historialOrden}
+                                setHistorialOrden={setHistorialOrden}
                             />
                         )}
 
@@ -2544,17 +2592,20 @@ const loadData = async () => {
 
                         {activeTab === 'ventas' && (
                             <div className="space-y-6 fade-in">
-                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-orange-500`}>
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h2 className="text-2xl font-bold flex items-center gap-2"><span>🛒</span> Registrar Venta</h2>
-                                        <button
-                                            type="button"
-                                            onClick={() => setMostrarConfigPrecios(true)}
-                                            className={`px-4 py-2 rounded-lg transition font-semibold flex items-center gap-2 ${darkMode ? 'bg-purple-900 text-purple-200 hover:bg-purple-800' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}>
-                                            ⚙️ Configurar Precios
-                                        </button>
-                                    </div>
-                                    <form onSubmit={addVenta} className="space-y-4">
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl border-t-8 border-orange-500 overflow-hidden`}>
+                                    <button type="button" onClick={() => setMostrarFormVenta(!mostrarFormVenta)}
+                                        className={`w-full flex justify-between items-center p-4 md:p-6 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-50'}`}>
+                                        <h2 className="text-lg md:text-2xl font-bold flex items-center gap-2"><span>🛒</span> Registrar Venta</h2>
+                                        <div className="flex items-center gap-2">
+                                            <button type="button" onClick={(e) => { e.stopPropagation(); setMostrarConfigPrecios(true); }}
+                                                className={`px-3 py-1 rounded-lg transition font-semibold text-xs flex items-center gap-1 ${darkMode ? 'bg-purple-900 text-purple-200 hover:bg-purple-800' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}>
+                                                ⚙️ Precios
+                                            </button>
+                                            <span className={`text-xl transition-transform duration-200 ${mostrarFormVenta ? 'rotate-180' : ''}`}>▼</span>
+                                        </div>
+                                    </button>
+                                    {mostrarFormVenta && <div className="px-4 pb-4 md:px-8 md:pb-8">
+                                    <form onSubmit={async (e) => { await addVenta(e); setMostrarFormVenta(false); }} className="space-y-4">
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <select value={ventaForm.cliente_id} onChange={(e) => setVentaForm({ ...ventaForm, cliente_id: e.target.value })} required className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
                                                 <option value="" className={darkMode ? 'bg-gray-700 text-white' : ''}>Seleccionar Cliente *</option>
@@ -2600,6 +2651,7 @@ const loadData = async () => {
 
                                         <button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white p-5 rounded-xl font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition shadow-lg pulse-hover">🚀 Registrar Venta</button>
                                     </form>
+                                    </div>}
                                 </div>
 
                                 <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-indigo-500`}>
@@ -3051,6 +3103,308 @@ const loadData = async () => {
                             </div>
                         )}
 
+                        {activeTab === 'inventario' && (
+                            <div className="space-y-4 fade-in">
+                                {/* Sub-tabs */}
+                                <div className="flex gap-2 flex-wrap">
+                                    {[
+                                        { id: 'stock', label: '📦 Stock' },
+                                        { id: 'entrada', label: '➕ Nueva Entrada' },
+                                        { id: 'salida', label: '➖ Registrar Uso' },
+                                        { id: 'movimientos', label: '📋 Movimientos' },
+                                    ].map(t => (
+                                        <button key={t.id} onClick={() => setInvTab(t.id)}
+                                            className={`px-3 py-2 rounded-xl font-semibold text-sm transition ${invTab === t.id ? 'bg-teal-600 text-white shadow-lg' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-white text-gray-600 hover:bg-teal-50 border border-gray-200'}`}>
+                                            {t.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* STOCK */}
+                                {invTab === 'stock' && (
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-t-8 border-teal-500`}>
+                                        <h2 className="text-lg md:text-2xl font-bold mb-4 flex items-center gap-2"><span>📦</span> Stock Disponible ({inventario.length})</h2>
+                                        {inventario.length === 0 ? (
+                                            <div className="text-center py-12">
+                                                <span className="text-5xl mb-3 block">📦</span>
+                                                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Sin productos. Agrega una entrada para comenzar.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {inventario.map(item => {
+                                                    const valorRestante = parseFloat(item.cantidad_disponible) * parseFloat(item.precio_por_unidad_uso);
+                                                    const agotado = parseFloat(item.cantidad_disponible) <= 0;
+                                                    return (
+                                                        <div key={item.id} className={`p-3 md:p-4 rounded-xl border-2 transition ${agotado ? darkMode ? 'border-red-800 bg-red-900/20' : 'border-red-300 bg-red-50' : darkMode ? 'border-gray-600 bg-gray-700' : 'border-teal-200 bg-teal-50'}`}>
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <div>
+                                                                    <p className={`font-bold text-sm md:text-base ${darkMode ? 'text-white' : 'text-gray-800'}`}>{item.nombre}</p>
+                                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? 'bg-teal-900 text-teal-300' : 'bg-teal-100 text-teal-700'}`}>{item.categoria}</span>
+                                                                </div>
+                                                                {agotado && <span className="text-xs px-2 py-1 bg-red-500 text-white rounded-full font-bold">AGOTADO</span>}
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                                                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-2 rounded-lg text-center`}>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Disponible</p>
+                                                                    <p className={`text-lg font-bold ${agotado ? 'text-red-500' : 'text-teal-600'}`}>{parseFloat(item.cantidad_disponible).toFixed(2)}</p>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{item.unidad_uso}</p>
+                                                                </div>
+                                                                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-2 rounded-lg text-center`}>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Valor restante</p>
+                                                                    <p className="text-sm font-bold text-green-500">{formatCOP(valorRestante)}</p>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{formatCOP(parseFloat(item.precio_por_unidad_uso))}/{item.unidad_uso}</p>
+                                                                </div>
+                                                            </div>
+                                                            <p className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                                1 {item.unidad_compra} = {item.conversion} {item.unidad_uso} · Última compra: {item.fecha_ultima_compra ? new Date(item.fecha_ultima_compra + 'T00:00:00').toLocaleDateString('es-CO') : '-'}
+                                                            </p>
+                                                            <div className="flex gap-2 mt-3">
+                                                                <button onClick={() => { setSalidaForm(s => ({ ...s, inventario_id: String(item.id) })); setInvTab('salida'); }}
+                                                                    className="flex-1 py-2 text-xs font-bold rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition">
+                                                                    ➖ Uso
+                                                                </button>
+                                                                <button onClick={() => { setInvSeleccionado(item); setInvForm({ nombre: item.nombre, categoria: item.categoria, unidad_compra: item.unidad_compra, unidad_uso: item.unidad_uso, conversion: String(item.conversion), cantidad_unidades: '1', precio_compra_total: '', fecha: new Date().toISOString().slice(0, 10) }); setInvTab('entrada'); }}
+                                                                    className="flex-1 py-2 text-xs font-bold rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition">
+                                                                    ➕ Compra
+                                                                </button>
+                                                                <button onClick={async () => { if (!confirm('¿Eliminar este producto del inventario?')) return; await supabaseClient.from('movimientos_inventario').delete().eq('inventario_id', item.id); await supabaseClient.from('inventario').delete().eq('id', item.id); pushToast('🗑️ Producto eliminado'); loadData(); }}
+                                                                    className="px-2 py-2 text-xs font-bold rounded-lg bg-red-600 text-white hover:bg-red-700 transition">
+                                                                    🗑️
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* NUEVA ENTRADA */}
+                                {invTab === 'entrada' && (
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-t-8 border-teal-500`}>
+                                        <h2 className="text-lg md:text-2xl font-bold mb-4 flex items-center gap-2">
+                                            <span>➕</span> {invSeleccionado ? `Nueva Compra — ${invSeleccionado.nombre}` : 'Registrar Nuevo Producto'}
+                                        </h2>
+                                        {invSeleccionado && (
+                                            <div className={`mb-4 p-3 rounded-xl flex justify-between items-center ${darkMode ? 'bg-teal-900/30 border-teal-700' : 'bg-teal-50 border-teal-300'} border`}>
+                                                <p className={`text-sm font-semibold ${darkMode ? 'text-teal-300' : 'text-teal-700'}`}>Agregando stock a: <span className="font-bold">{invSeleccionado.nombre}</span></p>
+                                                <button onClick={() => { setInvSeleccionado(null); setInvForm({ nombre: '', categoria: 'Materia Prima', unidad_compra: 'Bulto', unidad_uso: 'Kg', conversion: '', cantidad_unidades: '1', precio_compra_total: '', fecha: new Date().toISOString().slice(0, 10) }); setInvTab('stock'); }} className="text-gray-400 hover:text-red-500 text-xl font-bold px-2">✕ Cancelar</button>
+                                            </div>
+                                        )}
+                                        <form onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            if (!invForm.conversion || !invForm.precio_compra_total) { pushToast('Completa todos los campos', 'error'); return; }
+                                            setIsLoading(true);
+                                            try {
+                                                const cantUnidades = parseFloat(invForm.cantidad_unidades) || 1;
+                                                const convPorUnidad = parseFloat(invForm.conversion);
+                                                const totalKg = cantUnidades * convPorUnidad;
+                                                const precioTotal = parseFloat(invForm.precio_compra_total);
+                                                const fechaCompra = invForm.fecha || new Date().toISOString().slice(0, 10);
+                                                if (invSeleccionado) {
+                                                    const cantActual = parseFloat(invSeleccionado.cantidad_disponible) || 0;
+                                                    const precioActual = parseFloat(invSeleccionado.precio_por_unidad_uso) || 0;
+                                                    const nuevaCantidad = cantActual + totalKg;
+                                                    const nuevoPrecioUnit = ((precioActual * cantActual) + precioTotal) / nuevaCantidad;
+                                                    await supabaseClient.from('inventario').update({ cantidad_disponible: nuevaCantidad, precio_por_unidad_uso: nuevoPrecioUnit, precio_compra_total: (parseFloat(invSeleccionado.precio_compra_total) || 0) + precioTotal, fecha_ultima_compra: fechaCompra }).eq('id', invSeleccionado.id);
+                                                    await supabaseClient.from('movimientos_inventario').insert({ inventario_id: invSeleccionado.id, tipo: 'entrada', cantidad: totalKg, unidad: invSeleccionado.unidad_uso, concepto: `Compra ${cantUnidades} ${invSeleccionado.unidad_compra}(s) — ${formatCOP(precioTotal)}`, costo_calculado: precioTotal, fecha: fechaCompra, usuario_id: user?.id });
+                                                } else {
+                                                    const precioPorUnidad = precioTotal / totalKg;
+                                                    const { data: nuevo, error: errInv } = await supabaseClient.from('inventario').insert({ nombre: invForm.nombre, categoria: invForm.categoria, unidad_compra: invForm.unidad_compra, unidad_uso: invForm.unidad_uso, conversion: convPorUnidad, cantidad_disponible: totalKg, precio_compra_total: precioTotal, precio_por_unidad_uso: precioPorUnidad, fecha_ultima_compra: fechaCompra, usuario_id: user?.id }).select();
+                                                    if (errInv) throw errInv;
+                                                    if (nuevo?.[0]) await supabaseClient.from('movimientos_inventario').insert({ inventario_id: nuevo[0].id, tipo: 'entrada', cantidad: totalKg, unidad: invForm.unidad_uso, concepto: `Compra inicial ${cantUnidades} ${invForm.unidad_compra}(s) — ${formatCOP(precioTotal)}`, costo_calculado: precioTotal, fecha: fechaCompra, usuario_id: user?.id });
+                                                }
+                                                // Determinar id y nombre para egreso
+                                                let egresoInvId = invSeleccionado ? invSeleccionado.id : null;
+                                                const egresoNombre = invSeleccionado ? invSeleccionado.nombre : invForm.nombre;
+                                                // Si es producto nuevo, el id ya fue asignado arriba en 'nuevo'
+                                                if (!egresoInvId) {
+                                                    const { data: recienCreado } = await supabaseClient.from('inventario').select('id').eq('nombre', invForm.nombre).order('created_at', { ascending: false }).limit(1).single();
+                                                    egresoInvId = recienCreado?.id || null;
+                                                }
+                                                await supabaseClient.from('egresos').insert({ concepto: `Inventario - ${egresoNombre}${egresoInvId ? ' [INV:' + egresoInvId + ']' : ''}`, monto: precioTotal, categoria: 'Inventario', fecha: new Date(fechaCompra + 'T12:00:00').toISOString() });
+                                                pushToast('✅ Entrada registrada y egreso generado');
+                                                setInvForm({ nombre: '', categoria: 'Materia Prima', unidad_compra: 'Bulto', unidad_uso: 'Kg', conversion: '', cantidad_unidades: '1', precio_compra_total: '', fecha: new Date().toISOString().slice(0, 10) });
+                                                setInvSeleccionado(null);
+                                                setInvTab('stock');
+                                                await loadData();
+                                            } catch (err) {
+                                                console.error(err);
+                                                pushToast('Error al registrar entrada', 'error');
+                                            } finally { setIsLoading(false); }
+                                        }} className="space-y-4">
+                                            {!invSeleccionado && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Nombre del producto *</label>
+                                                        <input value={invForm.nombre} onChange={e => setInvForm({...invForm, nombre: e.target.value})} placeholder="Ej: Maíz, Sal, Bolsas..." required className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-teal-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                                    </div>
+                                                    <div>
+                                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Categoría</label>
+                                                        <select value={invForm.categoria} onChange={e => setInvForm({...invForm, categoria: e.target.value})} className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-teal-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`}>
+                                                            <option>Materia Prima</option>
+                                                            <option>Material</option>
+                                                            <option>Insumo</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Unidad de compra (como lo compras)</label>
+                                                        <select value={invForm.unidad_compra} onChange={e => setInvForm({...invForm, unidad_compra: e.target.value})} className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-teal-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`}>
+                                                            <option>Bulto</option><option>Caja</option><option>Galón</option><option>Botella</option><option>Paquete</option><option>Unidad</option><option>Rollo</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Unidad de uso (como lo gastas)</label>
+                                                        <select value={invForm.unidad_uso} onChange={e => setInvForm({...invForm, unidad_uso: e.target.value})} className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-teal-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`}>
+                                                            <option>Kg</option><option>Libra</option><option>Gramo</option><option>Litro</option><option>Mililitro</option><option>Unidad</option><option>Paquete</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                        ¿Cuántos {invSeleccionado ? invSeleccionado.unidad_compra : invForm.unidad_compra}s compraste? *
+                                                    </label>
+                                                    <input type="number" min="1" step="1" value={invForm.cantidad_unidades} onChange={e => setInvForm({...invForm, cantidad_unidades: e.target.value})} placeholder="Ej: 2" required className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-teal-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                                <div>
+                                                    <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                        ¿Cuántos {invSeleccionado ? invSeleccionado.unidad_uso : invForm.unidad_uso} tiene 1 {invSeleccionado ? invSeleccionado.unidad_compra : invForm.unidad_compra}? *
+                                                    </label>
+                                                    <input type="number" step="0.01" value={invForm.conversion} onChange={e => setInvForm({...invForm, conversion: e.target.value})} placeholder={`Ej: 50 ${invSeleccionado ? invSeleccionado.unidad_uso : invForm.unidad_uso} por ${invSeleccionado ? invSeleccionado.unidad_compra : invForm.unidad_compra}`} required className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-teal-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                                <div>
+                                                    <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Precio total de la compra *</label>
+                                                    <input type="text" inputMode="numeric" value={invForm.precio_compra_total ? parseInt(String(invForm.precio_compra_total).replace(/\D/g,'')).toLocaleString('es-CO') : ''} onChange={e => { const raw = e.target.value.replace(/\D/g,''); setInvForm({...invForm, precio_compra_total: raw}); }} placeholder="$ 0" required className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-teal-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                                <div>
+                                                    <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📅 Fecha de compra</label>
+                                                    <input type="date" value={invForm.fecha} onChange={e => setInvForm({...invForm, fecha: e.target.value})} className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-teal-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                            </div>
+                                            {invForm.conversion && invForm.precio_compra_total && invForm.cantidad_unidades && (
+                                                <div className={`p-4 rounded-xl border-2 grid grid-cols-2 gap-3 ${darkMode ? 'bg-teal-900/30 border-teal-700' : 'bg-teal-50 border-teal-300'}`}>
+                                                    <div>
+                                                        <p className={`text-xs ${darkMode ? 'text-teal-300' : 'text-teal-600'}`}>Total {invSeleccionado ? invSeleccionado.unidad_uso : invForm.unidad_uso} a ingresar</p>
+                                                        <p className="text-xl font-bold text-teal-600">{(parseFloat(invForm.cantidad_unidades) * parseFloat(invForm.conversion)).toFixed(2)} {invSeleccionado ? invSeleccionado.unidad_uso : invForm.unidad_uso}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className={`text-xs ${darkMode ? 'text-teal-300' : 'text-teal-600'}`}>Precio por {invSeleccionado ? invSeleccionado.unidad_uso : invForm.unidad_uso}</p>
+                                                        <p className="text-xl font-bold text-teal-600">{formatCOP(parseFloat(invForm.precio_compra_total) / (parseFloat(invForm.cantidad_unidades) * parseFloat(invForm.conversion)))}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <button type="submit" className="w-full bg-gradient-to-r from-teal-500 to-teal-600 text-white p-4 rounded-xl font-bold text-lg hover:from-teal-600 hover:to-teal-700 transition shadow-lg">
+                                                ✅ Registrar Entrada
+                                            </button>
+                                        </form>
+                                    </div>
+                                )}
+
+                                {/* REGISTRAR USO / SALIDA */}
+                                {invTab === 'salida' && (
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-t-8 border-orange-500`}>
+                                        <h2 className="text-lg md:text-2xl font-bold mb-4 flex items-center gap-2"><span>➖</span> Registrar Uso / Salida</h2>
+                                        <form onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            if (!salidaForm.inventario_id || !salidaForm.cantidad) { pushToast('Completa todos los campos', 'error'); return; }
+                                            const item = inventario.find(i => String(i.id) === String(salidaForm.inventario_id));
+                                            if (!item) { pushToast('Producto no encontrado', 'error'); return; }
+                                            const cantidadUso = parseFloat(salidaForm.cantidad);
+                                            if (cantidadUso > parseFloat(item.cantidad_disponible)) { pushToast(`Solo hay ${parseFloat(item.cantidad_disponible).toFixed(2)} ${item.unidad_uso} disponibles`, 'error'); return; }
+                                            setIsLoading(true);
+                                            try {
+                                                const costoUso = cantidadUso * parseFloat(item.precio_por_unidad_uso);
+                                                const nuevaCantidad = parseFloat(item.cantidad_disponible) - cantidadUso;
+                                                await supabaseClient.from('inventario').update({ cantidad_disponible: nuevaCantidad }).eq('id', item.id);
+                                                await supabaseClient.from('movimientos_inventario').insert({ inventario_id: item.id, tipo: 'salida', cantidad: cantidadUso, unidad: item.unidad_uso, concepto: salidaForm.concepto || 'Producción', costo_calculado: costoUso, fecha: salidaForm.fecha, usuario_id: user?.id });
+                                                pushToast(`✅ Salida registrada — Costo: ${formatCOP(costoUso)}`);
+                                                setSalidaForm({ inventario_id: '', cantidad: '', concepto: '', fecha: new Date().toISOString().slice(0, 10) });
+                                                setInvTab('stock');
+                                                await loadData();
+                                            } catch (err) {
+                                                console.error(err);
+                                                pushToast('Error al registrar salida', 'error');
+                                            } finally { setIsLoading(false); }
+                                        }} className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Producto *</label>
+                                                    <select value={salidaForm.inventario_id} onChange={e => setSalidaForm({...salidaForm, inventario_id: e.target.value})} required className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`}>
+                                                        <option value="">Seleccionar producto</option>
+                                                        {inventario.map(i => <option key={i.id} value={i.id}>{i.nombre} — {parseFloat(i.cantidad_disponible).toFixed(2)} {i.unidad_uso} disponibles</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                        Cantidad usada {salidaForm.inventario_id && `(${inventario.find(i => String(i.id) === String(salidaForm.inventario_id))?.unidad_uso})`} *
+                                                    </label>
+                                                    <input type="number" step="0.01" value={salidaForm.cantidad} onChange={e => setSalidaForm({...salidaForm, cantidad: e.target.value})} placeholder="0" required className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                                <div>
+                                                    <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Concepto</label>
+                                                    <input value={salidaForm.concepto} onChange={e => setSalidaForm({...salidaForm, concepto: e.target.value})} placeholder="Ej: Producción 21 marzo" className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                                <div>
+                                                    <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📅 Fecha</label>
+                                                    <input type="date" value={salidaForm.fecha} onChange={e => setSalidaForm({...salidaForm, fecha: e.target.value})} className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                                </div>
+                                            </div>
+                                            {salidaForm.inventario_id && salidaForm.cantidad && (() => {
+                                                const item = inventario.find(i => String(i.id) === String(salidaForm.inventario_id));
+                                                if (!item) return null;
+                                                const costo = parseFloat(salidaForm.cantidad) * parseFloat(item.precio_por_unidad_uso);
+                                                const restante = parseFloat(item.cantidad_disponible) - parseFloat(salidaForm.cantidad);
+                                                return (
+                                                    <div className={`p-4 rounded-xl border-2 grid grid-cols-2 gap-3 ${darkMode ? 'bg-orange-900/30 border-orange-700' : 'bg-orange-50 border-orange-300'}`}>
+                                                        <div>
+                                                            <p className={`text-xs ${darkMode ? 'text-orange-300' : 'text-orange-600'}`}>Costo de este uso</p>
+                                                            <p className="text-xl font-bold text-orange-500">{formatCOP(costo)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className={`text-xs ${darkMode ? 'text-orange-300' : 'text-orange-600'}`}>Quedaría disponible</p>
+                                                            <p className={`text-xl font-bold ${restante < 0 ? 'text-red-500' : 'text-teal-500'}`}>{restante.toFixed(2)} {item.unidad_uso}</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                            <button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4 rounded-xl font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition shadow-lg">
+                                                ✅ Registrar Uso
+                                            </button>
+                                        </form>
+                                    </div>
+                                )}
+
+                                {/* MOVIMIENTOS */}
+                                {invTab === 'movimientos' && (
+                                    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-t-8 border-purple-500`}>
+                                        <h2 className="text-lg md:text-2xl font-bold mb-4 flex items-center gap-2"><span>📋</span> Movimientos ({movimientos.length})</h2>
+                                        <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-hide">
+                                            {movimientos.length === 0 ? (
+                                                <p className="text-center py-8 text-gray-400">Sin movimientos registrados</p>
+                                            ) : movimientos.map(mov => (
+                                                <div key={mov.id} className={`flex justify-between items-center p-3 rounded-xl border-l-4 ${mov.tipo === 'entrada' ? darkMode ? 'bg-green-900/30 border-green-500' : 'bg-green-50 border-green-500' : darkMode ? 'bg-orange-900/30 border-orange-500' : 'bg-orange-50 border-orange-500'}`}>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${mov.tipo === 'entrada' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>{mov.tipo === 'entrada' ? '➕' : '➖'}</span>
+                                                            <p className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>{mov.inventario?.nombre || 'Producto'}</p>
+                                                        </div>
+                                                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{mov.concepto} · {mov.fecha ? new Date(mov.fecha + 'T00:00:00').toLocaleDateString('es-CO') : ''}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className={`font-bold text-sm ${mov.tipo === 'entrada' ? 'text-green-500' : 'text-orange-500'}`}>{mov.tipo === 'entrada' ? '+' : '-'}{parseFloat(mov.cantidad).toFixed(2)} {mov.inventario?.unidad_uso}</p>
+                                                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{formatCOP(mov.costo_calculado)}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {activeTab === 'resumen' && (
                             <div className="space-y-6 fade-in">
                                 <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-purple-500`}>
@@ -3101,7 +3455,8 @@ const loadData = async () => {
                                                         const totalEgresos = egresosPeriodo.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
                                                         const balance = totalIngresos - totalEgresos;
 
-                                                        // Guardar en historial
+                                                        const totalSaldoPeriodo = totalVentas - totalAbonos;
+                                                        // Guardar en historial con saldo pendiente
                                                         const { error: errorHistorial } = await supabaseClient.from('historial_resumenes').insert({
                                                             fecha_inicio: fechaInicio,
                                                             fecha_fin: fechaFin,
@@ -3110,7 +3465,7 @@ const loadData = async () => {
                                                             total_ingresos: totalIngresos,
                                                             total_egresos: totalEgresos,
                                                             balance: balance,
-                                                            notas: `Resumen del ${new Date(fechaInicio).toLocaleDateString('es-CO')} al ${new Date(fechaFin).toLocaleDateString('es-CO')}`,
+                                                            notas: `Resumen del ${new Date(fechaInicio).toLocaleDateString('es-CO')} al ${new Date(fechaFin).toLocaleDateString('es-CO')} | Saldo pendiente: $${totalSaldoPeriodo.toLocaleString('es-CO')}`,
                                                             usuario_id: user?.id
                                                         });
 
@@ -3119,6 +3474,13 @@ const loadData = async () => {
                                                             console.error('Error:', errorHistorial);
                                                             return;
                                                         }
+
+                                                        // Guardar fecha anterior para poder deshacer
+                                                        await supabaseClient.from('configuracion_sistema').upsert({
+                                                            clave: 'fecha_reinicio_anterior',
+                                                            valor: fechaUltimoReinicio || '2000-01-01',
+                                                            usuario_id: user?.id
+                                                        }, { onConflict: 'clave,usuario_id' });
 
                                                         // Actualizar fecha de último reinicio
                                                         const { error: errorConfig } = await supabaseClient
@@ -3150,6 +3512,31 @@ const loadData = async () => {
                                                 <span className="hidden md:inline">🔄 Reiniciar Resumen</span>
                                                 <span className="md:hidden">🔄</span>
                                             </button>
+                                            {fechaUltimoReinicio && (
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!confirm('⚠️ ¿Deshacer el último reinicio?\n\nEsto volverá la fecha de inicio al período anterior.')) return;
+                                                        setIsLoading(true);
+                                                        try {
+                                                            const { data: anterior } = await supabaseClient.from('configuracion_sistema').select('valor').eq('clave', 'fecha_reinicio_anterior').single();
+                                                            if (!anterior?.valor) { pushToast('No hay reinicio anterior para deshacer', 'error'); return; }
+                                                            await supabaseClient.from('configuracion_sistema').upsert({ clave: 'fecha_ultimo_reinicio', valor: anterior.valor, usuario_id: user?.id }, { onConflict: 'clave,usuario_id' });
+                                                            // Borrar el último historial guardado
+                                                            if (historialResumenes.length > 0) {
+                                                                await supabaseClient.from('historial_resumenes').delete().eq('id', historialResumenes[0].id);
+                                                            }
+                                                            await supabaseClient.from('configuracion_sistema').upsert({ clave: 'fecha_reinicio_anterior', valor: '', usuario_id: user?.id }, { onConflict: 'clave,usuario_id' });
+                                                            pushToast('✅ Reinicio deshecho correctamente');
+                                                            await loadData();
+                                                        } catch(err) {
+                                                            pushToast('Error al deshacer', 'error');
+                                                        } finally { setIsLoading(false); }
+                                                    }}
+                                                    className="px-3 py-2 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg hover:from-gray-600 hover:to-gray-700 transition font-semibold shadow-lg text-sm">
+                                                    <span className="hidden md:inline">↩️ Deshacer Reinicio</span>
+                                                    <span className="md:hidden">↩️</span>
+                                                </button>
+                                            )}
                                         </div>
                                         {/* Modal Historial de Resúmenes */}
                                         {mostrarHistorial && (
@@ -3209,8 +3596,12 @@ const loadData = async () => {
                                                                     </div>
 
                                                                     {hist.notas && (
-                                                                        <p className="text-sm text-gray-600 mt-3 italic">{hist.notas}</p>
+                                                                        <p className={`text-xs mt-3 italic ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{hist.notas}</p>
                                                                     )}
+                                                                    <div className={`mt-2 p-2 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                                                                        <p className="text-xs text-gray-500">Saldo pendiente del período</p>
+                                                                        <p className="text-base font-bold text-red-500">{formatCOP(hist.total_ventas - hist.total_abonos)}</p>
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -3236,7 +3627,7 @@ const loadData = async () => {
                                             <p className="text-base md:text-3xl font-bold">{formatCOP(resumen.totalAbonos)}</p>
                                         </div>
                                         <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-3 md:p-6 rounded-xl md:rounded-2xl shadow-xl">
-                                            <p className="text-red-100 text-xs md:text-sm font-medium mb-1 md:mb-2">Saldo</p>
+                                            <p className="text-red-100 text-xs md:text-sm font-medium mb-1 md:mb-2">Saldo Pendiente</p>
                                             <p className="text-base md:text-3xl font-bold">{formatCOP(resumen.totalSaldo)}</p>
                                         </div>
                                         <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-3 md:p-6 rounded-xl md:rounded-2xl shadow-xl">
