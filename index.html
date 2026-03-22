@@ -313,30 +313,15 @@
         function LandingPage({ onEnter }) {
             return (
                 <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-100 to-yellow-50 flex items-center justify-center p-4 relative overflow-hidden">
-                    <div className="absolute inset-0 opacity-10">
-                        <div className="absolute top-20 left-10 text-8xl">🌽</div>
-                        <div className="absolute bottom-20 right-10 text-8xl">🔥</div>
-                        <div className="absolute top-40 right-20 text-6xl">🌾</div>
-                        <div className="absolute bottom-40 left-20 text-6xl">🧡</div>
-                    </div>
-
-                    <div className="fade-in text-center relative z-10">
-                        <div className="float-animation mb-8">
-                            <img src="Arepas.png" alt="Arepas al Carbón" className="w-80 h-80 mx-auto drop-shadow-2xl" />
-                        </div>
-
-                        <h1 className="text-5xl md:text-6xl font-bold gradient-text mb-6">Arepas al Carbon</h1>
-
-                        <p className="text-2xl md:text-3xl text-gray-700 font-semibold mb-4 px-4">
-                            "Nada más colombiano que una arepa al carbón
+                    <div className="fade-in text-center relative z-10 w-full max-w-xs mx-auto">
+                        <img src="Arepas.png" alt="Arepas al Carbón" className="w-40 h-40 md:w-56 md:h-56 mx-auto drop-shadow-2xl mb-4" />
+                        <h1 className="text-3xl md:text-5xl font-bold gradient-text mb-3">Arepas al Carbon</h1>
+                        <p className="text-sm md:text-lg text-gray-600 font-semibold mb-6 px-2">
+                            "Nada más colombiano que una arepa al carbón hecha con amor del campo"
                         </p>
-                        <p className="text-2xl md:text-3xl text-gray-700 font-semibold mb-12 px-4">
-                            hecha con amor del campo"
-                        </p>
-
                         <button
                             onClick={onEnter}
-                            className="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-12 py-5 rounded-full font-bold text-xl hover:from-amber-700 hover:to-orange-700 transition shadow-2xl pulse-hover">
+                            className="w-full bg-gradient-to-r from-amber-600 to-orange-600 text-white px-8 py-4 rounded-full font-bold text-base md:text-lg hover:from-amber-700 hover:to-orange-700 transition shadow-2xl">
                             🚀 Entrar pa'voltear la Arepa
                         </button>
                     </div>
@@ -706,7 +691,14 @@
             const toggleHistorial = (id) => setHistorialAbiertos(prev => ({ ...prev, [id]: !prev[id] }));
             const [historialBusqueda, setHistorialBusqueda] = useState('');
             const [historialOrden, setHistorialOrden] = useState('az');
-            const [darkMode, setDarkMode] = useState(false);
+            const [darkMode, setDarkMode] = useState(() => {
+                try { return localStorage.getItem('darkMode') === 'true'; } catch(e) { return false; }
+            });
+            const toggleDarkMode = () => {
+                const next = !darkMode;
+                setDarkMode(next);
+                try { localStorage.setItem('darkMode', String(next)); } catch(e) {}
+            };
             const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
             const [mostrarPerfilCliente, setMostrarPerfilCliente] = useState(false);
             const [resDesde, setResDesde] = useState('');
@@ -757,6 +749,10 @@
             const [salidaForm, setSalidaForm] = useState({ inventario_id: '', cantidad: '', concepto: '', fecha: new Date().toISOString().slice(0, 10) });
             const [invTab, setInvTab] = useState('stock');
             const [invSeleccionado, setInvSeleccionado] = useState(null);
+            const [rentabilidad, setRentabilidad] = useState([]);
+            const [rentFecha, setRentFecha] = useState(new Date().toISOString().slice(0, 10));
+            const [rentInsumos, setRentInsumos] = useState([]);
+            const [rentNotas, setRentNotas] = useState('');
 
             const pushToast = (msg, type = 'success') => { const id = Date.now() + Math.random(); const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'; setToasts(t => [...t, { id, message: msg, type, icon }]); setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 5000); };
             // Funciones para modales personalizados
@@ -1044,7 +1040,8 @@ const loadData = async () => {
                         { data: config },
                         { data: hist },
                         { data: inv },
-                        { data: mov }
+                        { data: mov },
+                        { data: rent }
                     ] = await Promise.all([
                         supabaseClient.from('clientes').select('*').order('created_at', { ascending: false }),
                         supabaseClient.from('ventas').select('*, clientes(nombre)').eq('archivado', false).order('fecha', { ascending: false }),
@@ -1055,7 +1052,8 @@ const loadData = async () => {
                         supabaseClient.from('configuracion_sistema').select('*').eq('clave', 'fecha_ultimo_reinicio').single(),
                         supabaseClient.from('historial_resumenes').select('*').order('created_at', { ascending: false }),
                         supabaseClient.from('inventario').select('*').order('created_at', { ascending: false }),
-                        supabaseClient.from('movimientos_inventario').select('*, inventario(nombre, unidad_uso)').order('fecha', { ascending: false })
+                        supabaseClient.from('movimientos_inventario').select('*, inventario(nombre, unidad_uso)').order('fecha', { ascending: false }),
+                        supabaseClient.from('registros_rentabilidad').select('*').order('fecha', { ascending: false })
                     ]);
 
                     if (errorVentas) pushToast('Error al cargar ventas', 'error');
@@ -1070,6 +1068,7 @@ const loadData = async () => {
                     setHistorialResumenes(hist || []);
                     setInventario(inv || []);
                     setMovimientos(mov || []);
+                    setRentabilidad(rent || []);
                 } catch (err) {
                     console.error(err);
                     pushToast('Error cargando datos', 'error');
@@ -1690,7 +1689,7 @@ const loadData = async () => {
                                     ⌨️ Atajos
                                 </button>
                                 <button
-                                    onClick={() => setDarkMode(!darkMode)}
+                                    onClick={() => toggleDarkMode()}
                                     className="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg font-medium transition backdrop-blur-sm text-sm">
                                     <span className="hidden md:inline">{darkMode ? '🔥 Calentá la arepa, ve' : '☠️ Ya, que huele a quemao'}</span>
                                     <span className="md:hidden">{darkMode ? '🔥' : '☠️'}</span>
@@ -1776,6 +1775,15 @@ const loadData = async () => {
 
                                                 <button
                                                     onClick={() => {
+                                                        setActiveTab('rentabilidad');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'rentabilidad' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>💹</span> Rentabilidad
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
                                                         setActiveTab('resumen');
                                                         setShowMenu(false);
                                                     }}
@@ -1822,6 +1830,7 @@ const loadData = async () => {
                             { id: 'calendario', label: 'Calendario', icon: '📅' },
                             { id: 'contabilidad', label: 'Contabilidad', icon: '💰' },
                             { id: 'inventario', label: 'Inventario', icon: '📦' },
+                            { id: 'rentabilidad', label: 'Rentabilidad', icon: '💹' },
                             { id: 'resumen', label: 'Resumen', icon: '📈' }
                         ].map(tab => (
                             <button key={tab.id} onClick={() => { setActiveTab(tab.id); setFilterDate(''); setFilterEstado('Todos'); }} className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all whitespace-nowrap ${activeTab === tab.id ? darkMode ? 'border-b-4 border-orange-500 text-orange-400 bg-gray-700' : 'border-b-4 border-orange-600 text-orange-600 bg-orange-50' : darkMode ? 'text-gray-300 hover:text-orange-400 hover:bg-gray-700' : 'text-gray-600 hover:text-orange-600 hover:bg-amber-50'}`}>
@@ -3405,6 +3414,257 @@ const loadData = async () => {
                             </div>
                         )}
 
+                        {activeTab === 'rentabilidad' && (
+                            <div className="space-y-4 fade-in">
+                                {/* FORMULARIO NUEVO REGISTRO */}
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-t-8 border-green-500`}>
+                                    <h2 className="text-lg md:text-2xl font-bold mb-4 flex items-center gap-2">
+                                        <span>💹</span> Registrar Día de Producción
+                                    </h2>
+
+                                    {/* Fecha y ventas del día */}
+                                    <div className="mb-4">
+                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📅 Fecha de producción</label>
+                                        <input type="date" value={rentFecha} onChange={e => {
+                                            setRentFecha(e.target.value);
+                                            // Pre-cargar insumos del inventario con cantidad 0
+                                            setRentInsumos(inventario.map(item => ({
+                                                id: item.id,
+                                                nombre: item.nombre,
+                                                unidad: item.unidad_uso,
+                                                precio_por_unidad: parseFloat(item.precio_por_unidad_uso) || 0,
+                                                cantidad: ''
+                                            })));
+                                        }}
+                                        className={`w-full md:w-64 p-3 border-2 rounded-xl focus:ring-2 focus:ring-green-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                    </div>
+
+                                    {/* Ventas del día seleccionado */}
+                                    {rentFecha && (() => {
+                                        const ventasDia = ventas.filter(v => v.fecha && v.fecha.slice(0,10) === rentFecha);
+                                        const totalVentasDia = ventasDia.reduce((s,v) => s + (parseFloat(v.total) || 0), 0);
+                                        return ventasDia.length > 0 ? (
+                                            <div className={`mb-4 p-3 rounded-xl border-2 ${darkMode ? 'bg-green-900/30 border-green-700' : 'bg-green-50 border-green-300'}`}>
+                                                <p className={`text-xs font-semibold mb-1 ${darkMode ? 'text-green-300' : 'text-green-700'}`}>💰 Ventas del día ({ventasDia.length} ventas)</p>
+                                                <p className="text-2xl font-bold text-green-600">{formatCOP(totalVentasDia)}</p>
+                                            </div>
+                                        ) : (
+                                            <div className={`mb-4 p-3 rounded-xl border-2 ${darkMode ? 'bg-yellow-900/30 border-yellow-700' : 'bg-yellow-50 border-yellow-300'}`}>
+                                                <p className={`text-sm ${darkMode ? 'text-yellow-300' : 'text-yellow-700'}`}>⚠️ No hay ventas registradas para esta fecha</p>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* Insumos */}
+                                    <div className="mb-4">
+                                        <h3 className={`text-sm font-bold mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>📦 Insumos usados</h3>
+                                        {rentInsumos.length === 0 ? (
+                                            <div className={`p-4 rounded-xl border-2 border-dashed text-center ${darkMode ? 'border-gray-600 text-gray-400' : 'border-gray-300 text-gray-500'}`}>
+                                                <p className="text-sm">Selecciona una fecha para ver los insumos del inventario</p>
+                                                {inventario.length === 0 && <p className="text-xs mt-1">⚠️ No tienes insumos en el inventario</p>}
+                                                {inventario.length > 0 && rentFecha && (
+                                                    <button onClick={() => setRentInsumos(inventario.map(item => ({
+                                                        id: item.id, nombre: item.nombre, unidad: item.unidad_uso,
+                                                        precio_por_unidad: parseFloat(item.precio_por_unidad_uso) || 0, cantidad: ''
+                                                    })))}
+                                                    className="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition">
+                                                        Cargar insumos
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {rentInsumos.map((ins, idx) => (
+                                                    <div key={ins.id} className={`p-3 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>{ins.nombre}</p>
+                                                                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{formatCOP(ins.precio_por_unidad)} / {ins.unidad}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={ins.cantidad}
+                                                                    onChange={e => {
+                                                                        const updated = [...rentInsumos];
+                                                                        updated[idx] = { ...ins, cantidad: e.target.value };
+                                                                        setRentInsumos(updated);
+                                                                    }}
+                                                                    placeholder={`0 ${ins.unidad}`}
+                                                                    className={`w-28 p-2 border-2 rounded-lg text-sm focus:ring-2 focus:ring-green-500 ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`}
+                                                                />
+                                                                <span className={`text-xs font-bold w-24 text-right ${darkMode ? 'text-green-300' : 'text-green-700'}`}>
+                                                                    {ins.cantidad ? formatCOP(parseFloat(ins.cantidad) * ins.precio_por_unidad) : '-'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {/* Totales en tiempo real */}
+                                                {(() => {
+                                                    const totalCostos = rentInsumos.reduce((s, ins) => s + (parseFloat(ins.cantidad) || 0) * ins.precio_por_unidad, 0);
+                                                    const ventasDia = ventas.filter(v => v.fecha && v.fecha.slice(0,10) === rentFecha);
+                                                    const totalVentas = ventasDia.reduce((s,v) => s + (parseFloat(v.total) || 0), 0);
+                                                    const ganancia = totalVentas - totalCostos;
+                                                    const margen = totalVentas > 0 ? (ganancia / totalVentas * 100) : 0;
+                                                    return (
+                                                        <div className={`mt-3 p-3 rounded-xl border-2 ${darkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-300'}`}>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <div>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total costos</p>
+                                                                    <p className="font-bold text-red-500">{formatCOP(totalCostos)}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Ventas del día</p>
+                                                                    <p className="font-bold text-green-500">{formatCOP(totalVentas)}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Ganancia</p>
+                                                                    <p className={`font-bold text-lg ${ganancia >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatCOP(ganancia)}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Margen</p>
+                                                                    <p className={`font-bold text-lg ${margen >= 0 ? 'text-blue-500' : 'text-red-500'}`}>{margen.toFixed(1)}%</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Notas */}
+                                    <div className="mb-4">
+                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📝 Notas (opcional)</label>
+                                        <input type="text" value={rentNotas} onChange={e => setRentNotas(e.target.value)}
+                                            placeholder="Ej: Día lluvioso, menos ventas..."
+                                            className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-green-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'}`} />
+                                    </div>
+
+                                    {/* Botón guardar */}
+                                    <button onClick={async () => {
+                                        if (!rentFecha) { pushToast('Selecciona una fecha', 'error'); return; }
+                                        const insumosUsados = rentInsumos.filter(ins => parseFloat(ins.cantidad) > 0);
+                                        const totalCostos = insumosUsados.reduce((s, ins) => s + parseFloat(ins.cantidad) * ins.precio_por_unidad, 0);
+                                        const ventasDia = ventas.filter(v => v.fecha && v.fecha.slice(0,10) === rentFecha);
+                                        const totalVentas = ventasDia.reduce((s,v) => s + (parseFloat(v.total) || 0), 0);
+                                        const ganancia = totalVentas - totalCostos;
+                                        const margen = totalVentas > 0 ? (ganancia / totalVentas * 100) : 0;
+
+                                        setIsLoading(true);
+                                        try {
+                                            // Guardar registro
+                                            const { error } = await supabaseClient.from('registros_rentabilidad').insert({
+                                                fecha: rentFecha,
+                                                total_ventas: totalVentas,
+                                                total_costos: totalCostos,
+                                                ganancia: ganancia,
+                                                margen: margen,
+                                                insumos: insumosUsados,
+                                                notas: rentNotas || null,
+                                                usuario_id: user?.id
+                                            });
+                                            if (error) { pushToast('Error al guardar: ' + error.message, 'error'); return; }
+
+                                            // Descontar del inventario cada insumo usado
+                                            for (const ins of insumosUsados) {
+                                                const item = inventario.find(i => i.id === ins.id);
+                                                if (item) {
+                                                    const nuevaCantidad = Math.max(0, (parseFloat(item.cantidad_disponible) || 0) - parseFloat(ins.cantidad));
+                                                    await supabaseClient.from('inventario').update({ cantidad_disponible: nuevaCantidad }).eq('id', ins.id);
+                                                    await supabaseClient.from('movimientos_inventario').insert({
+                                                        inventario_id: ins.id, tipo: 'salida',
+                                                        cantidad: parseFloat(ins.cantidad), unidad: ins.unidad,
+                                                        concepto: `Producción ${rentFecha}`,
+                                                        costo_calculado: parseFloat(ins.cantidad) * ins.precio_por_unidad,
+                                                        fecha: rentFecha, usuario_id: user?.id
+                                                    });
+                                                }
+                                            }
+
+                                            pushToast('✅ Día de producción guardado');
+                                            setRentFecha(new Date().toISOString().slice(0, 10));
+                                            setRentInsumos([]);
+                                            setRentNotas('');
+                                            await loadData();
+                                        } catch(err) {
+                                            pushToast('Error al guardar', 'error');
+                                        } finally { setIsLoading(false); }
+                                    }}
+                                    className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold text-lg hover:from-green-600 hover:to-green-700 transition shadow-lg">
+                                        💾 Guardar Día de Producción
+                                    </button>
+                                </div>
+
+                                {/* HISTORIAL */}
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl`}>
+                                    <h3 className={`text-base md:text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                        <span>📋</span> Historial de Producción ({rentabilidad.length})
+                                    </h3>
+                                    {rentabilidad.length === 0 ? (
+                                        <div className="text-center py-10">
+                                            <span className="text-5xl mb-3 block">📊</span>
+                                            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Sin registros aún</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {rentabilidad.map(reg => {
+                                                const fecha = reg.fecha ? new Date(reg.fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+                                                return (
+                                                    <div key={reg.id} className={`p-3 md:p-4 rounded-xl border-2 ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-gray-50'}`}>
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div>
+                                                                <p className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>📅 {fecha}</p>
+                                                                {reg.notas && <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{reg.notas}</p>}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`text-sm font-bold px-2 py-1 rounded-lg ${parseFloat(reg.ganancia) >= 0 ? darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700' : darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-700'}`}>
+                                                                    {parseFloat(reg.ganancia) >= 0 ? '📈' : '📉'} {formatCOP(reg.ganancia)}
+                                                                </span>
+                                                                <button onClick={async () => {
+                                                                    showConfirm('🗑️ Eliminar registro', '¿Eliminar este día de producción?', async () => {
+                                                                        const { error } = await supabaseClient.from('registros_rentabilidad').delete().eq('id', reg.id);
+                                                                        if (error) { pushToast('Error', 'error'); } else { pushToast('🗑️ Eliminado'); loadData(); }
+                                                                    });
+                                                                }} className={`p-1.5 rounded-lg text-xs transition ${darkMode ? 'bg-red-900 text-red-300 hover:bg-red-800' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}>🗑️</button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-2 rounded-lg text-center`}>
+                                                                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Ventas</p>
+                                                                <p className="text-sm font-bold text-green-500">{formatCOP(reg.total_ventas)}</p>
+                                                            </div>
+                                                            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-2 rounded-lg text-center`}>
+                                                                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Costos</p>
+                                                                <p className="text-sm font-bold text-red-500">{formatCOP(reg.total_costos)}</p>
+                                                            </div>
+                                                            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-2 rounded-lg text-center`}>
+                                                                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Margen</p>
+                                                                <p className={`text-sm font-bold ${parseFloat(reg.margen) >= 0 ? 'text-blue-500' : 'text-red-500'}`}>{parseFloat(reg.margen).toFixed(1)}%</p>
+                                                            </div>
+                                                        </div>
+                                                        {/* Detalle insumos */}
+                                                        {reg.insumos && reg.insumos.length > 0 && (
+                                                            <div className="mt-2 flex flex-wrap gap-1">
+                                                                {reg.insumos.map((ins, i) => (
+                                                                    <span key={i} className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+                                                                        {ins.nombre}: {ins.cantidad} {ins.unidad}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {activeTab === 'resumen' && (
                             <div className="space-y-6 fade-in">
                                 <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-purple-500`}>
@@ -4414,6 +4674,7 @@ const loadData = async () => {
                     )}
                     <Toast toasts={toasts} remove={removeToast} />
                 </div>
+           
             );
         }
 
