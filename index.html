@@ -273,13 +273,13 @@
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js')
-                .then(reg => console.log('SW registrado'))
-                .catch(err => console.log('SW error:', err));
+                .then(() => {})
+                .catch(() => {});
         }
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo, useCallback } = React;
         const { createClient } = supabase;
         const SUPABASE_URL = 'https://xybyupmrtiyspxlzcaug.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Ynl1cG1ydGl5c3B4bHpjYXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODk3MDYsImV4cCI6MjA3NTQ2NTcwNn0.EHS9tI0-2vllcfdU-W4zeCVWf7csG24CtVmUbmk7s1M'; // mantén tu key completa
@@ -693,7 +693,7 @@
 
                     setAbonoTotal('');
                     setSelectedCliente(null);
-                    await loadData();
+                    await loadData(true);
 
                 } catch (err) {
                     console.error('Error en handleAbonoTotal:', err);
@@ -858,6 +858,9 @@
             const [productos, setProductos] = useState([]);
             const [opcionesSeleccionadas, setOpcionesSeleccionadas] = useState({});
             const [modalProducto, setModalProducto] = useState(null);
+            const [modalAprobar, setModalAprobar] = useState(null); // cliente portal pendiente
+            const [buscarClienteVinc, setBuscarClienteVinc] = useState('');
+            const [clienteVinculado, setClienteVinculado] = useState(null);
             const [acordeonNegocio, setAcordeonNegocio] = useState({});
             const toggleAcordeon = (key) => setAcordeonNegocio(prev => ({ ...prev, [key]: !prev[key] }));
             const [acordeonPortal, setAcordeonPortal] = useState({});
@@ -1121,8 +1124,6 @@
                     // Crear URL de WhatsApp
                     const url = `https://wa.me/${telefono.replace('+', '')}?text=${mensajeEncoded}`;
 
-                    console.log('📱 Abriendo WhatsApp con:', url); // Para debug
-
                     // Abrir WhatsApp
                     window.open(url, '_blank');
 
@@ -1137,7 +1138,7 @@
        
 
             // Calcular top clientes
-            const calcularTopClientes = () => {
+            const calcularTopClientes = useCallback(() => {
                 const clientesData = clientes.filter(c => c.activo !== false).map(cliente => {
                     const ventasCliente = ventas.filter(v => v.cliente_id === cliente.id);
                     const totalCompras = ventasCliente.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
@@ -1156,7 +1157,7 @@
                 });
 
                 return clientesData.sort((a, b) => b.totalCompras - a.totalCompras);
-            };
+            }, [clientes, ventas]);
 
             // Calcular clientes inactivos (más de 30 días sin comprar)
             const calcularClientesInactivos = () => {
@@ -1306,8 +1307,8 @@
                 if (session?.user) await loadData();
                 setLoading(false);
             };
-const loadData = async () => {
-                setIsLoading(true);
+const loadData = async (silencioso = false) => {
+                if (!silencioso) setIsLoading(true);
                 try {
                     const [
                         { data: cl },
@@ -1323,11 +1324,11 @@ const loadData = async () => {
                         { data: rent }
                     ] = await Promise.all([
                         supabaseClient.from('clientes').select('*').order('created_at', { ascending: false }),
-                        supabaseClient.from('ventas').select('*, clientes(nombre)').eq('archivado', false).order('fecha', { ascending: false }),
-                        supabaseClient.from('ingresos').select('*').eq('archivado', false).order('fecha', { ascending: false }),
-                        supabaseClient.from('egresos').select('*').eq('archivado', false).order('fecha', { ascending: false }),
-                        supabaseClient.from('notas_calendario').select('*').order('fecha', { ascending: true }),
-                        supabaseClient.from('compras_materia_prima').select('*').order('fecha', { ascending: false }),
+                        supabaseClient.from('ventas').select('*, clientes(nombre)').eq('archivado', false).order('fecha', { ascending: false }).limit(300),
+                        supabaseClient.from('ingresos').select('*').eq('archivado', false).order('fecha', { ascending: false }).limit(200),
+                        supabaseClient.from('egresos').select('*').eq('archivado', false).order('fecha', { ascending: false }).limit(200),
+                        supabaseClient.from('notas_calendario').select('*').order('fecha', { ascending: true }).limit(100),
+                        supabaseClient.from('compras_materia_prima').select('*').order('fecha', { ascending: false }).limit(100),
                         supabaseClient.from('configuracion_sistema').select('*').eq('clave', 'fecha_ultimo_reinicio').single(),
                         supabaseClient.from('historial_resumenes').select('*').order('created_at', { ascending: false }),
                         supabaseClient.from('inventario').select('*').order('created_at', { ascending: false }),
@@ -1410,7 +1411,7 @@ const loadData = async () => {
                 } else {
                     pushToast('✅ Cliente agregado');
                     setClienteForm({ nombre: '', direccion: '', tipo_cliente: 'Individual', dia_entrega: '', precio_especial: '', telefono: '', notas: '' });
-                    loadData();
+                    loadData(true);
                 }
             };
 
@@ -1530,7 +1531,7 @@ const loadData = async () => {
                         abono: '', notas: ''
                     });
 
-                    await loadData();
+                    await loadData(true);
 
                 } catch (err) {
                     console.error('Error:', err);
@@ -1765,13 +1766,11 @@ const loadData = async () => {
                                 .eq('id', ventaId);
 
                             if (!errorUpdate) {
-                                console.log(`✅ Abono actualizado en venta ${ventaId}: $${abonoActual} -> $${nuevoAbono}`);
                             } else {
                                 console.error('Error al actualizar venta:', errorUpdate);
                             }
                         }
                     } else {
-                        console.log('⚠️ No se encontró ID de venta asociada a este ingreso');
                     }
                 }
 
@@ -1920,7 +1919,7 @@ const loadData = async () => {
             };
 
             const clienteDisplay = (id) => { const c = clientes.find(x => x.id === parseInt(id)); return c?.nombre || 'Cliente'; };
-            const ventasFiltradas = ventas.filter(v => {
+            const ventasFiltradas = useMemo(() => ventas.filter(v => {
                 if (filterDate) {
                     if (!v.fecha) return false;
                     if (v.fecha.slice(0, 10) !== filterDate) return false;
@@ -1936,7 +1935,7 @@ const loadData = async () => {
                     return (b.clientes?.nombre || '').localeCompare(a.clientes?.nombre || '', 'es', { sensitivity: 'base' });
                 }
                 return 0;
-            });
+            }), [ventas, filterDate, filterEstado, ordenAlfabetico, ordenZA]);
             const calcularResumen = () => {
                 try {
                     const desde = resDesde ? new Date(resDesde) : (fechaUltimoReinicio ? new Date(fechaUltimoReinicio) : new Date('2000-01-01'));
@@ -1971,11 +1970,17 @@ const loadData = async () => {
                 }
             };
 
-            const resumen = calcularResumen();
-            const totalIngresosGlobal = ingresos.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
-            const totalEgresosGlobal = egresos.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
-            const balanceGlobal = totalIngresosGlobal - totalEgresosGlobal;
-            const ventasPendientes = ventas.filter(v => v.estado_pago === 'Pendiente').reduce((s, v) => s + (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0), 0);
+            const resumen = useMemo(() => calcularResumen(), [ventas, ingresos, egresos, resDesde, resHasta, fechaUltimoReinicio]);
+            const { totalIngresosGlobal, totalEgresosGlobal, balanceGlobal, ventasPendientes } = useMemo(() => {
+                const totalIngresosGlobal = ingresos.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
+                const totalEgresosGlobal = egresos.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
+                return {
+                    totalIngresosGlobal,
+                    totalEgresosGlobal,
+                    balanceGlobal: totalIngresosGlobal - totalEgresosGlobal,
+                    ventasPendientes: ventas.filter(v => v.estado_pago === 'Pendiente').reduce((s, v) => s + (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0), 0)
+                };
+            }, [ingresos, egresos, ventas]);
 
             if (showLanding) return <LandingPage
                 onEnterAdmin={() => { setModoAcceso('admin'); setShowLanding(false); }}
@@ -2340,7 +2345,7 @@ const loadData = async () => {
                                                         className="w-full text-left">
                                                         {prod.imagen_url && (
                                                             <img src={prod.imagen_url} alt={prod.nombre}
-                                                                className="w-full h-48 object-cover" />
+                                                                loading="lazy" className="w-full h-48 object-cover" />
                                                         )}
                                                         <div className="p-4 flex justify-between items-center">
                                                             <h3 className="text-lg font-bold text-gray-800">{prod.nombre}</h3>
@@ -2419,7 +2424,7 @@ const loadData = async () => {
                     </div>
                 );
             }
-            if (!user) return <LoginPage onLogin={setUser} />;
+            if (!user) return <LoginPage onLogin={async (u) => { setUser(u); await loadData(); }} />;
 
             return (
                 <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
@@ -2944,19 +2949,10 @@ const loadData = async () => {
                                                         <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(p.created_at).toLocaleDateString('es-CO')}</p>
                                                     </div>
                                                     <div className="flex gap-2">
-                                                        <button onClick={async () => {
-                                                            await supabaseClient.from('clientes_portal').update({ estado: 'aprobado' }).eq('id', p.id);
-                                                            enviarNotifLocal('✅ Cliente aprobado', p.nombre + ' ya puede acceder al portal');
-                                                            // Si no tiene cliente_id, crear el cliente
-                                                            if (!p.cliente_id) {
-                                                                const { data: nuevoCliente } = await supabaseClient.from('clientes').insert({ nombre: p.nombre, telefono: p.telefono, tipo_cliente: 'Individual', activo: true }).select();
-                                                                if (nuevoCliente?.[0]) await supabaseClient.from('clientes_portal').update({ cliente_id: nuevoCliente[0].id }).eq('id', p.id);
-                                                            }
-                                                            pushToast('✅ Cliente aprobado');
-                                                            // Notificar al cliente por WhatsApp
-                                                            const msg = `¡Hola ${p.nombre}! 🎉 Tu cuenta en el portal de Arepas al Carbón fue aprobada. Ya puedes ingresar con tu número ${p.telefono}. ¡Bienvenido!`;
-                                                            window.open(`https://wa.me/${p.telefono}?text=${encodeURIComponent(msg)}`, '_blank');
-                                                            loadData();
+                                                        <button onClick={() => {
+                                                            setModalAprobar(p);
+                                                            setBuscarClienteVinc('');
+                                                            setClienteVinculado(null);
                                                         }} className="px-3 py-2 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600 transition">
                                                             ✅ Aprobar
                                                         </button>
@@ -3167,7 +3163,6 @@ const loadData = async () => {
                                             for (let dia = 1; dia <= diasMes; dia++) {
                                                 const fechaStr = `${mesActual.getFullYear()}-${String(mesActual.getMonth() + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
                                                 const notasDelDia = (notasCalendario || []).filter(n => n && n.fecha === fechaStr);
-                                                if (dia === 1) console.log('🔍 Notas del día 1:', fechaStr, notasDelDia); // TEMPORAL
                                                 const esHoy = hoy.getDate() === dia && hoy.getMonth() === mesActual.getMonth() && hoy.getFullYear() === mesActual.getFullYear();
 
                                                 dias.push(
@@ -4605,6 +4600,52 @@ const loadData = async () => {
                                         }} className={`w-full p-3 rounded-xl font-bold text-sm transition ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                                             🔔 Enviar notificación de prueba
                                         </button>
+                                    </div>
+                                    )}
+                                </div>
+
+                                {/* Código QR */}
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden border-t-4 border-pink-500`}>
+                                    <button onClick={() => toggleAcordeon('qr')}
+                                        className={`w-full flex justify-between items-center p-4 md:p-5 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                                        <h3 className="font-bold text-base md:text-lg flex items-center gap-2"><span>📲</span> Código QR de la App</h3>
+                                        <span className={`text-lg transition-transform duration-200 ${acordeonNegocio['qr'] ? 'rotate-180' : ''}`}>▼</span>
+                                    </button>
+                                    {acordeonNegocio['qr'] && (
+                                    <div className="px-4 pb-6 md:px-6 flex flex-col items-center">
+                                        <p className={`text-sm mb-4 text-center ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                                            Comparte este QR con tus clientes para que accedan al portal
+                                        </p>
+                                        <div className="bg-white p-4 rounded-2xl shadow-lg">
+                                            <img
+                                                src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https://arepas-al-fuego.netlify.app/&color=78350f&bgcolor=ffffff&margin=10"
+                                                alt="QR Arepas al Carbón"
+                                                className="w-56 h-56"
+                                                id="qr-img"
+                                            />
+                                        </div>
+                                        <p className="text-xs text-gray-400 mt-2 mb-4">arepas-al-fuego.netlify.app</p>
+                                        <div className="flex gap-3 w-full">
+                                            <a href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=https://arepas-al-fuego.netlify.app/&color=78350f&bgcolor=ffffff&margin=10"
+                                                download="QR-Arepas-al-Carbon.png"
+                                                target="_blank"
+                                                onClick={() => pushToast('✅ Descargando QR...')}
+                                                className="flex-1 bg-gradient-to-r from-pink-500 to-pink-600 text-white p-3 rounded-xl font-bold text-sm hover:from-pink-600 hover:to-pink-700 transition flex items-center justify-center gap-2">
+                                                ⬇️ Descargar QR
+                                            </a>
+                                            <button onClick={() => {
+                                                const url = 'https://arepas-al-fuego.netlify.app/';
+                                                if (navigator.share) {
+                                                    navigator.share({ title: 'Portal Arepas al Carbón', text: '¡Regístrate en nuestro portal! 🫓', url })
+                                                        .catch(() => {});
+                                                } else {
+                                                    navigator.clipboard?.writeText(url).then(() => pushToast('✅ Link copiado'));
+                                                }
+                                            }}
+                                            className={`flex-1 p-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                                                📤 Compartir link
+                                            </button>
+                                        </div>
                                     </div>
                                     )}
                                 </div>
@@ -6110,6 +6151,111 @@ const loadData = async () => {
                                             Cancelar
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal aprobación cliente portal */}
+                    {modalAprobar && (
+                        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setModalAprobar(null)}>
+                            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-2xl shadow-2xl w-full max-w-md`} onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-bold flex items-center gap-2">✅ Aprobar Cliente</h3>
+                                    <button onClick={() => setModalAprobar(null)} className="text-2xl hover:text-red-500">×</button>
+                                </div>
+
+                                {/* Info del solicitante */}
+                                <div className={`p-3 rounded-xl mb-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                                    <p className="font-bold">{modalAprobar.nombre}</p>
+                                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📱 {modalAprobar.telefono}</p>
+                                </div>
+
+                                {/* Opciones */}
+                                <p className={`text-sm font-semibold mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>¿Este usuario ya existe como cliente?</p>
+
+                                {/* Buscar cliente existente */}
+                                <div className="mb-4">
+                                    <input type="text"
+                                        value={buscarClienteVinc}
+                                        onChange={e => { setBuscarClienteVinc(e.target.value); setClienteVinculado(null); }}
+                                        placeholder="🔍 Buscar cliente existente..."
+                                        className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+
+                                    {/* Lista de coincidencias */}
+                                    {buscarClienteVinc.length > 0 && (
+                                        <div className={`mt-2 border-2 rounded-xl overflow-hidden max-h-40 overflow-y-auto ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                            {clientes.filter(c => c.activo !== false &&
+                                                c.nombre.toLowerCase().includes(buscarClienteVinc.toLowerCase())
+                                            ).slice(0, 6).map(c => (
+                                                <button key={c.id}
+                                                    onClick={() => { setClienteVinculado(c); setBuscarClienteVinc(c.nombre); }}
+                                                    className={`w-full text-left px-3 py-2 text-sm transition ${clienteVinculado?.id === c.id ? 'bg-green-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-50 text-gray-800'}`}>
+                                                    <span className="font-medium">{c.nombre}</span>
+                                                    <span className={`text-xs ml-2 ${clienteVinculado?.id === c.id ? 'text-green-100' : 'text-gray-400'}`}>{c.tipo_cliente}</span>
+                                                </button>
+                                            ))}
+                                            {clientes.filter(c => c.activo !== false && c.nombre.toLowerCase().includes(buscarClienteVinc.toLowerCase())).length === 0 && (
+                                                <p className="px-3 py-2 text-sm text-gray-400">Sin resultados</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {clienteVinculado && (
+                                    <div className={`p-3 rounded-xl mb-4 border-2 border-green-400 ${darkMode ? 'bg-green-900/20' : 'bg-green-50'}`}>
+                                        <p className="text-sm font-bold text-green-600">✅ Vincular con: {clienteVinculado.nombre}</p>
+                                        <p className="text-xs text-gray-500">Se usará este cliente existente</p>
+                                    </div>
+                                )}
+
+                                <div className="flex flex-col gap-2">
+                                    {/* Aprobar vinculando o creando */}
+                                    <button onClick={async () => {
+                                        let clienteId = clienteVinculado?.id || null;
+
+                                        // Si no vinculó, crear cliente nuevo
+                                        if (!clienteId) {
+                                            const { data: nuevo } = await supabaseClient.from('clientes').insert({
+                                                nombre: modalAprobar.nombre,
+                                                telefono: modalAprobar.telefono,
+                                                tipo_cliente: 'Individual',
+                                                activo: true
+                                            }).select();
+                                            clienteId = nuevo?.[0]?.id || null;
+                                        } else {
+                                            // Actualizar teléfono del cliente existente si no lo tiene
+                                            if (!clienteVinculado.telefono) {
+                                                await supabaseClient.from('clientes').update({ telefono: modalAprobar.telefono }).eq('id', clienteId);
+                                            }
+                                        }
+
+                                        // Aprobar en portal
+                                        await supabaseClient.from('clientes_portal').update({
+                                            estado: 'aprobado',
+                                            cliente_id: clienteId
+                                        }).eq('id', modalAprobar.id);
+
+                                        enviarNotifLocal('✅ Cliente aprobado', modalAprobar.nombre + ' ya puede acceder al portal');
+                                        pushToast('✅ Cliente aprobado');
+
+                                        // Notificar por WhatsApp
+                                        const msg = `¡Hola ${modalAprobar.nombre}! 🎉 Tu cuenta en el portal de Arepas al Carbón fue aprobada. Ya puedes ingresar con tu número. ¡Bienvenido! 🫓`;
+                                        window.open(`https://wa.me/${modalAprobar.telefono}?text=${encodeURIComponent(msg)}`, '_blank');
+
+                                        setModalAprobar(null);
+                                        setBuscarClienteVinc('');
+                                        setClienteVinculado(null);
+                                        loadData();
+                                    }}
+                                    className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-xl font-bold text-sm hover:from-green-600 hover:to-green-700 transition">
+                                        {clienteVinculado ? `✅ Aprobar y vincular con ${clienteVinculado.nombre}` : '✅ Aprobar y crear como nuevo cliente'}
+                                    </button>
+
+                                    <button onClick={() => { setModalAprobar(null); setBuscarClienteVinc(''); setClienteVinculado(null); }}
+                                        className={`w-full p-3 rounded-xl font-bold text-sm transition ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+                                        Cancelar
+                                    </button>
                                 </div>
                             </div>
                         </div>
