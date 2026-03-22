@@ -258,14 +258,11 @@
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
         }
 
-        /* Inputs en modo oscuro */
-        @media (prefers-color-scheme: dark) {
-
-            input:not([type="date"]):not([type="number"]),
-            textarea,
-            select {
-                color-scheme: dark;
-            }
+        /* Forzar inputs claros siempre */
+        input, textarea, select {
+            color-scheme: light;
+            background-color: white;
+            color: #111827;
         }
     </style>
 
@@ -273,6 +270,13 @@
 
 <body>
     <div id="root"></div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('SW registrado'))
+                .catch(err => console.log('SW error:', err));
+        }
+    </script>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
@@ -310,20 +314,210 @@
             );
         }
 
-        function LandingPage({ onEnter }) {
+        function LandingPage({ onEnterAdmin, onEnterCliente }) {
             return (
-                <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-100 to-yellow-50 flex items-center justify-center p-4 relative overflow-hidden">
-                    <div className="fade-in text-center relative z-10 w-full max-w-xs mx-auto">
-                        <img src="Arepas.png" alt="Arepas al Carbón" className="w-40 h-40 md:w-56 md:h-56 mx-auto drop-shadow-2xl mb-4" />
-                        <h1 className="text-3xl md:text-5xl font-bold gradient-text mb-3">Arepas al Carbon</h1>
-                        <p className="text-sm md:text-lg text-gray-600 font-semibold mb-6 px-2">
+                <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-100 to-yellow-50 flex items-center justify-center p-4">
+                    <div className="fade-in text-center w-full max-w-sm mx-auto">
+                        <img src="Arepas.png" alt="Arepas al Carbón" className="w-36 h-36 md:w-48 md:h-48 mx-auto drop-shadow-2xl mb-4" />
+                        <h1 className="text-3xl md:text-4xl font-bold gradient-text mb-2">Arepas al Carbon</h1>
+                        <p className="text-sm text-gray-500 font-medium mb-8 px-2">
                             "Nada más colombiano que una arepa al carbón hecha con amor del campo"
                         </p>
-                        <button
-                            onClick={onEnter}
-                            className="w-full bg-gradient-to-r from-amber-600 to-orange-600 text-white px-8 py-4 rounded-full font-bold text-base md:text-lg hover:from-amber-700 hover:to-orange-700 transition shadow-2xl">
-                            🚀 Entrar pa'voltear la Arepa
+                        <p className="text-sm font-semibold text-gray-600 mb-4">¿Cómo deseas ingresar?</p>
+                        <div className="space-y-3">
+                            <button onClick={onEnterAdmin}
+                                className="w-full bg-gradient-to-r from-amber-600 to-orange-600 text-white px-8 py-4 rounded-2xl font-bold text-base hover:from-amber-700 hover:to-orange-700 transition shadow-lg flex items-center justify-center gap-3">
+                                <span className="text-2xl">🔐</span>
+                                <div className="text-left">
+                                    <p className="font-bold">Administrador</p>
+                                    <p className="text-xs opacity-80">Acceso al sistema de gestión</p>
+                                </div>
+                            </button>
+                            <button onClick={onEnterCliente}
+                                className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-2xl font-bold text-base hover:from-green-600 hover:to-green-700 transition shadow-lg flex items-center justify-center gap-3">
+                                <span className="text-2xl">👤</span>
+                                <div className="text-left">
+                                    <p className="font-bold">Soy Cliente</p>
+                                    <p className="text-xs opacity-80">Ver mi cuenta y productos</p>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function LoginCliente({ onLogin, onVolver }) {
+            const [telefono, setTelefono] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+            const [modo, setModo] = useState('login'); // 'login' o 'registro'
+            const [nombre, setNombre] = useState('');
+
+            const handleLogin = async () => {
+                if (!telefono || telefono.length < 7) { setError('Ingresa un número válido'); return; }
+                setLoading(true); setError('');
+                try {
+                    const tel = telefono.replace(/\D/g, '');
+                    // Normalizar: quitar 57 si viene con código de país
+                    const telSin57 = tel.startsWith('57') && tel.length === 12 ? tel.slice(2) : tel;
+                    const telCon57 = '57' + telSin57;
+
+                    // Buscar en clientes_portal con ambos formatos
+                    const { data: portalData } = await supabaseClient
+                        .from('clientes_portal')
+                        .select('*, clientes(*)')
+                        .or(`telefono.eq.${telSin57},telefono.eq.${telCon57}`)
+                        .maybeSingle();
+
+                    if (portalData) {
+                        if (portalData.estado === 'pendiente') {
+                            setError('Tu cuenta está pendiente de aprobación. Te avisaremos pronto.');
+                            setLoading(false); return;
+                        }
+                        if (portalData.estado === 'rechazado') {
+                            setError('Tu cuenta no fue aprobada. Contacta al negocio.');
+                            setLoading(false); return;
+                        }
+                        await supabaseClient.from('clientes_portal').update({ ultimo_acceso: new Date().toISOString() }).eq('id', portalData.id);
+                        onLogin(portalData);
+                        return;
+                    }
+
+                    // Si no está en portal, buscar en tabla clientes con ambos formatos
+                    const { data: clienteExistente } = await supabaseClient
+                        .from('clientes')
+                        .select('*')
+                        .or(`telefono.eq.${telSin57},telefono.eq.${telCon57}`)
+                        .eq('activo', true)
+                        .maybeSingle();
+
+                    if (clienteExistente) {
+                        const { data: nuevoPortal, error: errPortal } = await supabaseClient
+                            .from('clientes_portal')
+                            .insert({
+                                telefono: clienteExistente.telefono,
+                                nombre: clienteExistente.nombre,
+                                estado: 'aprobado',
+                                cliente_id: clienteExistente.id,
+                                ultimo_acceso: new Date().toISOString()
+                            }).select().single();
+
+                        if (!errPortal && nuevoPortal) {
+                            onLogin({ ...nuevoPortal, clientes: clienteExistente });
+                            return;
+                        }
+                    }
+
+                    setError('Número no encontrado. ¿Eres nuevo? Regístrate abajo.');
+                } catch(err) {
+                    setError('Error al ingresar. Intenta de nuevo.');
+                } finally { setLoading(false); }
+            };
+
+            const handleRegistro = async () => {
+                if (!nombre.trim()) { setError('Ingresa tu nombre'); return; }
+                if (!telefono || telefono.length < 7) { setError('Ingresa un número válido'); return; }
+                setLoading(true); setError('');
+                try {
+                    const tel = telefono.replace(/\D/g, '');
+                    // Verificar si ya existe
+                    const { data: existe } = await supabaseClient.from('clientes_portal').select('id').eq('telefono', tel).single();
+                    if (existe) { setError('Este número ya está registrado. Intenta ingresar.'); setLoading(false); return; }
+
+                    // Buscar si hay un cliente con ese teléfono en clientes
+                    const { data: clienteExistente } = await supabaseClient.from('clientes').select('id').eq('telefono', tel).single();
+
+                    // Crear registro en clientes_portal
+                    const { error } = await supabaseClient.from('clientes_portal').insert({
+                        telefono: tel,
+                        nombre: nombre.trim(),
+                        estado: 'pendiente',
+                        cliente_id: clienteExistente?.id || null
+                    });
+
+                    if (error) { setError('Error al registrarse: ' + error.message); setLoading(false); return; }
+
+                    // Notificar al admin por WhatsApp
+                    const msgAdmin = `🔔 Nuevo cliente registrado en el portal:\n\nNombre: ${nombre}\nTeléfono: ${tel}\n\nEntra a la app para aprobarlo.`;
+                    const waUrl = `https://wa.me/57${tel}?text=${encodeURIComponent(msgAdmin)}`;
+
+                    setError('');
+                    setModo('pendiente');
+                } catch(err) {
+                    setError('Error al registrarse.');
+                } finally { setLoading(false); }
+            };
+
+            if (modo === 'pendiente') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
+                        <div className="fade-in bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center border-t-8 border-green-500">
+                            <span className="text-6xl mb-4 block">⏳</span>
+                            <h2 className="text-2xl font-bold text-gray-800 mb-3">¡Registro exitoso!</h2>
+                            <p className="text-gray-600 mb-6">Tu cuenta está pendiente de aprobación. Te avisaremos pronto por WhatsApp.</p>
+                            <button onClick={() => { setModo('login'); setNombre(''); setTelefono(''); }}
+                                className="w-full bg-green-600 text-white p-3 rounded-xl font-bold hover:bg-green-700 transition">
+                                Volver al inicio
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
+                    <div className="fade-in bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm border-t-8 border-green-500">
+                        <div className="text-center mb-6">
+                            <img src="Arepas.png" alt="Logo" className="w-20 h-20 mx-auto mb-3 drop-shadow-lg" />
+                            <h1 className="text-2xl font-bold gradient-text">Arepas al Carbon</h1>
+                            <p className="text-gray-500 text-sm mt-1">Portal de Clientes</p>
+                        </div>
+
+                        <div className="flex gap-2 mb-6">
+                            <button onClick={() => { setModo('login'); setError(''); }}
+                                className={`flex-1 py-2 rounded-xl font-bold text-sm transition ${modo === 'login' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                Ingresar
+                            </button>
+                            <button onClick={() => { setModo('registro'); setError(''); }}
+                                className={`flex-1 py-2 rounded-xl font-bold text-sm transition ${modo === 'registro' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                Registrarse
+                            </button>
+                        </div>
+
+                        <button onClick={onVolver}
+                            className="w-full mb-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition flex items-center justify-center gap-1">
+                            ← Volver a selección de acceso
                         </button>
+
+                        <div className="space-y-4">
+                            {modo === 'registro' && (
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">👤 Tu nombre completo</label>
+                                    <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+                                        placeholder="Ej: Juan Pérez"
+                                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white text-gray-900" />
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">📱 Tu número de WhatsApp</label>
+                                <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)}
+                                    placeholder="Ej: 3001234567"
+                                    className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white text-gray-900" />
+                            </div>
+
+                            {error && (
+                                <div className="bg-red-50 border-2 border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm flex items-center gap-2">
+                                    <span>⚠️</span> {error}
+                                </div>
+                            )}
+
+                            <button onClick={modo === 'login' ? handleLogin : handleRegistro}
+                                disabled={loading}
+                                className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold text-lg hover:from-green-600 hover:to-green-700 transition disabled:opacity-50 shadow-lg">
+                                {loading ? '🔄 Cargando...' : modo === 'login' ? '🚀 Ingresar' : '✅ Registrarse'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             );
@@ -363,12 +557,12 @@
                         <form onSubmit={handleLogin} className="space-y-5">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">📧 Correo electrónico</label>
-                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition" placeholder="tu@email.com" required />
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition bg-white text-gray-900" placeholder="tu@email.com" required />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">🔒 Contraseña</label>
-                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition" placeholder="••••••••" required />
+                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition bg-white text-gray-900" placeholder="••••••••" required />
                             </div>
 
                             {error && (
@@ -657,6 +851,25 @@
         function App() {
 
             const [showLanding, setShowLanding] = useState(true);
+            const [modoAcceso, setModoAcceso] = useState(null); // 'admin' | 'cliente'
+            const [clientePortal, setClientePortal] = useState(null);
+            const [clientesPendientes, setClientesPendientes] = useState([]);
+            const [configNegocio, setConfigNegocio] = useState({});
+            const [productos, setProductos] = useState([]);
+            const [opcionesSeleccionadas, setOpcionesSeleccionadas] = useState({});
+            const [modalProducto, setModalProducto] = useState(null);
+            const [acordeonNegocio, setAcordeonNegocio] = useState({});
+            const toggleAcordeon = (key) => setAcordeonNegocio(prev => ({ ...prev, [key]: !prev[key] }));
+            const [acordeonPortal, setAcordeonPortal] = useState({});
+            const toggleAcordeonPortal = (key) => setAcordeonPortal(prev => ({ ...prev, [key]: !prev[key] }));
+            const [pushPermiso, setPushPermiso] = useState(null);
+            const [configNotif, setConfigNotif] = useState({ hora_inicio: '06:00', hora_fin: '21:00' });
+            const [avisos, setAvisos] = useState([]);
+            const [avisoForm, setAvisoForm] = useState({ id: null, mensaje: '', fecha_fin: '', hora_inicio: '', hora_fin: '' });
+            const [configPuntos, setConfigPuntos] = useState({ monto_minimo: 12000, puntos_por_compra: 50, meses_vencimiento: 3 });
+            const [premios, setPremios] = useState([]);
+            const [premioForm, setPremioForm] = useState({ id: null, nombre: '', descripcion: '', puntos_necesarios: '', fecha_vencimiento: '' }); // para editar en admin
+            const [tabPortal, setTabPortal] = useState('inicio');
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
             const [activeTab, setActiveTab] = useState('dashboard');
@@ -753,6 +966,32 @@
             const [rentFecha, setRentFecha] = useState(new Date().toISOString().slice(0, 10));
             const [rentInsumos, setRentInsumos] = useState([]);
             const [rentNotas, setRentNotas] = useState('');
+
+            // Solicitar permiso push
+            const solicitarPermisoPush = async () => {
+                if (!('Notification' in window)) { pushToast('Tu navegador no soporta notificaciones', 'error'); return; }
+                const permiso = await Notification.requestPermission();
+                setPushPermiso(permiso);
+                if (permiso === 'granted') pushToast('✅ Notificaciones activadas');
+                else pushToast('Notificaciones bloqueadas', 'error');
+            };
+
+            // Verificar si está en horario permitido
+            const enHorario = () => {
+                const ahora = new Date();
+                const actual = ahora.getHours() * 60 + ahora.getMinutes();
+                const [hiH, hiM] = (configNotif.hora_inicio || '06:00').split(':').map(Number);
+                const [hfH, hfM] = (configNotif.hora_fin || '21:00').split(':').map(Number);
+                return actual >= (hiH * 60 + hiM) && actual <= (hfH * 60 + hfM);
+            };
+
+            // Enviar notificación local
+            const enviarNotifLocal = (titulo, cuerpo) => {
+                if (!enHorario()) return;
+                if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                    new Notification(titulo, { body: cuerpo, icon: '/Arepas.png' });
+                }
+            };
 
             const pushToast = (msg, type = 'success') => { const id = Date.now() + Math.random(); const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'; setToasts(t => [...t, { id, message: msg, type, icon }]); setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 5000); };
             // Funciones para modales personalizados
@@ -950,7 +1189,47 @@
             };
             const removeToast = (id) => setToasts(t => t.filter(x => x.id !== id));
 
-            useEffect(() => { checkUserAndLoad(); }, []);
+            useEffect(() => {
+                checkUserAndLoad();
+                if ('Notification' in window) setPushPermiso(Notification.permission);
+            }, []);
+
+            // Cargar datos para el portal del cliente
+            useEffect(() => {
+                if (modoAcceso !== 'cliente' || !clientePortal) return;
+                const cargarPortal = async () => {
+                    const { data: cfgNeg } = await supabaseClient.from('config_negocio').select('*');
+                    if (cfgNeg) {
+                        const cfg = {};
+                        cfgNeg.forEach(c => { cfg[c.clave] = c.valor; });
+                        setConfigNegocio(cfg);
+                    }
+                    if (clientePortal.cliente_id) {
+                        const { data: vs } = await supabaseClient.from('ventas').select('*').eq('cliente_id', clientePortal.cliente_id).eq('archivado', false).order('fecha', { ascending: false });
+                        if (vs) setVentas(vs);
+                        const { data: cl } = await supabaseClient.from('clientes').select('*').eq('id', clientePortal.cliente_id).single();
+                        if (cl) setClientes([cl]);
+                    }
+                    // Cargar productos
+                    const { data: prods } = await supabaseClient.from('productos_catalogo').select('*').eq('activo', true).order('orden');
+                    if (prods) setProductos(prods);
+                    // Cargar premios
+                    const { data: premsPortal } = await supabaseClient.from('premios_fidelidad').select('*').eq('activo', true).order('puntos_necesarios');
+                    if (premsPortal) setPremios(premsPortal);
+                    // Cargar config puntos
+                    const { data: cfgPtsPortal } = await supabaseClient.from('config_puntos').select('*').single();
+                    if (cfgPtsPortal) setConfigPuntos(cfgPtsPortal);
+                    // Cargar avisos activos
+                    const hoy = new Date().toISOString().slice(0,10);
+                    const { data: avs } = await supabaseClient.from('avisos_dia').select('*')
+                        .eq('activo', true)
+                        .lte('fecha_inicio', hoy)
+                        .or(`fecha_fin.is.null,fecha_fin.gte.${hoy}`)
+                        .order('created_at', { ascending: false });
+                    if (avs) setAvisos(avs);
+                };
+                cargarPortal();
+            }, [modoAcceso, clientePortal?.id]);
             // Atajos de teclado
             useEffect(() => {
                 const handleKeyboard = (e) => {
@@ -1069,6 +1348,27 @@ const loadData = async () => {
                     setInventario(inv || []);
                     setMovimientos(mov || []);
                     setRentabilidad(rent || []);
+                    const { data: prods } = await supabaseClient.from('productos_catalogo').select('*').order('orden');
+                    if (prods) setProductos(prods);
+                    const { data: avsTodos } = await supabaseClient.from('avisos_dia').select('*').order('created_at', { ascending: false });
+                    if (avsTodos) setAvisos(avsTodos);
+                    const { data: cfgPts } = await supabaseClient.from('config_puntos').select('*').single();
+                    if (cfgPts) setConfigPuntos(cfgPts);
+                    const { data: prems } = await supabaseClient.from('premios_fidelidad').select('*').order('puntos_necesarios');
+                    if (prems) setPremios(prems);
+                    // Cargar config negocio
+                    const { data: cfgNeg } = await supabaseClient.from('config_negocio').select('*');
+                    if (cfgNeg) {
+                        const cfg = {};
+                        cfgNeg.forEach(c => { cfg[c.clave] = c.valor; });
+                        setConfigNegocio(cfg);
+                    }
+                    // Cargar clientes pendientes del portal
+                    const { data: pendientes } = await supabaseClient.from('clientes_portal').select('*').eq('estado', 'pendiente').order('created_at', { ascending: false });
+                    setClientesPendientes(pendientes || []);
+                    if (pendientes && pendientes.length > 0) {
+                        enviarNotifLocal('🔔 Arepas al Carbón', `Tienes ${pendientes.length} cliente(s) esperando aprobación`);
+                    }
                 } catch (err) {
                     console.error(err);
                     pushToast('Error cargando datos', 'error');
@@ -1077,7 +1377,19 @@ const loadData = async () => {
                 }
             };
 
-            const handleLogout = async () => { await supabaseClient.auth.signOut(); setUser(null); setShowLanding(true); pushToast('Sesión cerrada'); };
+            const handleLogout = async () => {
+                if (clientePortal) {
+                    setClientePortal(null);
+                    setModoAcceso(null);
+                    setShowLanding(true);
+                } else {
+                    await supabaseClient.auth.signOut();
+                    setUser(null);
+                    setModoAcceso(null);
+                    setShowLanding(true);
+                    pushToast('Sesión cerrada');
+                }
+            };
 
             const addCliente = async (e) => {
                 e.preventDefault();
@@ -1201,6 +1513,15 @@ const loadData = async () => {
                         }).select();
                     }
 
+                    // Acumular puntos si la venta supera el monto mínimo
+                    if (total >= (configPuntos.monto_minimo || 12000)) {
+                        const ptsGanar = configPuntos.puntos_por_compra || 50;
+                        const clienteActual = clientes.find(c => c.id === parseInt(ventaForm.cliente_id));
+                        if (clienteActual) {
+                            const nuevosPuntos = (clienteActual.puntos || 0) + ptsGanar;
+                            await supabaseClient.from('clientes').update({ puntos: nuevosPuntos }).eq('id', clienteActual.id);
+                        }
+                    }
                     pushToast('✅ Venta registrada');
                     setVentaForm({
                         cliente_id: '', semana: '', tipo_venta: 'Individual', cantidad: '',
@@ -1656,8 +1977,448 @@ const loadData = async () => {
             const balanceGlobal = totalIngresosGlobal - totalEgresosGlobal;
             const ventasPendientes = ventas.filter(v => v.estado_pago === 'Pendiente').reduce((s, v) => s + (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0), 0);
 
-            if (showLanding) return <LandingPage onEnter={() => setShowLanding(false)} />;
+            if (showLanding) return <LandingPage
+                onEnterAdmin={() => { setModoAcceso('admin'); setShowLanding(false); }}
+                onEnterCliente={() => { setModoAcceso('cliente'); setShowLanding(false); }}
+            />;
             if (loading) return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-100 to-orange-100"><div className="text-center"><div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-orange-600"></div><p className="mt-4 text-xl font-semibold text-gray-700">Cargando...</p></div></div>;
+            if (modoAcceso === 'cliente' && !clientePortal) return <LoginCliente onLogin={(data) => { setClientePortal(data); }} onVolver={() => { setModoAcceso(null); setShowLanding(true); }} />;
+            if (modoAcceso === 'cliente' && clientePortal) {
+                // Datos del cliente
+                const ventasCliente = ventas.filter(v => v.cliente_id === clientePortal.cliente_id);
+                const deudas = ventasCliente.filter(v => v.estado_pago === 'Pendiente');
+                const totalDeuda = deudas.reduce((s,v) => s + (parseFloat(v.total)||0) - (parseFloat(v.abono)||0), 0);
+                const clienteInfo = clientes.find(c => c.id === clientePortal.cliente_id);
+
+                // Agrupar deudas por fecha
+                const deudasPorFecha = {};
+                deudas.forEach(v => {
+                    const f = v.fecha ? v.fecha.slice(0,10) : 'sin-fecha';
+                    const label = v.fecha ? new Date(v.fecha.slice(0,10)+'T00:00:00').toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'}) : 'Sin fecha';
+                    if (!deudasPorFecha[f]) deudasPorFecha[f] = { label, ventas: [], total: 0 };
+                    deudasPorFecha[f].ventas.push(v);
+                    deudasPorFecha[f].total += (parseFloat(v.total)||0) - (parseFloat(v.abono)||0);
+                });
+
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex flex-col max-w-md mx-auto">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-amber-600 to-orange-600 text-white p-4 shadow-lg">
+                            <div className="flex justify-between items-center">
+                                <button onClick={() => setTabPortal('perfil')} className="flex items-center gap-3 hover:opacity-80 transition">
+                                    <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center font-bold text-lg">
+                                        {clientePortal.nombre.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="font-bold text-sm">{clientePortal.nombre}</p>
+                                        <p className="text-xs text-amber-100">{configNegocio.nombre || 'Arepas al Carbón'} · Ver perfil →</p>
+                                    </div>
+                                </button>
+                                <button onClick={handleLogout} className="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                                    🚪 Salir
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Contenido por tab */}
+                        <div className="flex-1 overflow-y-auto p-4 pb-24">
+
+                            {/* TAB PERFIL */}
+                            {tabPortal === 'perfil' && (
+                                <div className="space-y-4 fade-in">
+                                    <div className="bg-white rounded-2xl shadow p-5">
+                                        <div className="flex items-center gap-4 mb-5">
+                                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center font-bold text-3xl text-white shadow">
+                                                {clientePortal.nombre.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-lg text-gray-800">{clientePortal.nombre}</h3>
+                                                <p className="text-sm text-gray-500">📱 {clientePortal.telefono}</p>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-500 mb-1 block">👤 Nombre</label>
+                                                <input type="text" defaultValue={clientePortal.nombre} id="portal-nombre"
+                                                    className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 bg-white text-gray-900" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-500 mb-1 block">📱 Teléfono</label>
+                                                <input type="tel" defaultValue={clientePortal.telefono} id="portal-telefono"
+                                                    className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 bg-white text-gray-900" />
+                                            </div>
+                                            <button onClick={async () => {
+                                                const nuevoNombre = document.getElementById('portal-nombre').value.trim();
+                                                const nuevoTel = document.getElementById('portal-telefono').value.trim().replace(/\D/g,'');
+                                                if (!nuevoNombre || !nuevoTel) { pushToast('Completa todos los campos', 'error'); return; }
+                                                const { error } = await supabaseClient.from('clientes_portal').update({ nombre: nuevoNombre, telefono: nuevoTel }).eq('id', clientePortal.id);
+                                                if (!error) {
+                                                    if (clientePortal.cliente_id) await supabaseClient.from('clientes').update({ nombre: nuevoNombre, telefono: nuevoTel }).eq('id', clientePortal.cliente_id);
+                                                    setClientePortal({ ...clientePortal, nombre: nuevoNombre, telefono: nuevoTel });
+                                                    pushToast('✅ Perfil actualizado');
+                                                    setTabPortal('inicio');
+                                                } else { pushToast('Error al guardar', 'error'); }
+                                            }}
+                                            className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white p-3 rounded-xl font-bold text-sm hover:from-orange-600 hover:to-orange-700 transition">
+                                                💾 Guardar cambios
+                                            </button>
+                                            <button onClick={() => setTabPortal('inicio')}
+                                                className="w-full bg-gray-100 text-gray-600 p-3 rounded-xl font-bold text-sm hover:bg-gray-200 transition">
+                                                ← Volver
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TAB INICIO */}
+                            {tabPortal === 'inicio' && (
+                                <div className="space-y-4 fade-in">
+                                    {/* Avisos del día */}
+                                    {avisos.length > 0 && avisos.map(av => (
+                                        <div key={av.id} className="bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-2xl shadow p-4 flex items-start gap-3">
+                                            <span className="text-2xl flex-shrink-0">📢</span>
+                                            <div>
+                                                <p className="text-sm font-semibold leading-relaxed">{av.mensaje}</p>
+                                                {(av.hora_inicio || av.fecha_fin) && (
+                                                    <p className="text-xs opacity-80 mt-1">
+                                                        {av.hora_inicio && `🕐 ${av.hora_inicio.slice(0,5)}${av.hora_fin ? ' - ' + av.hora_fin.slice(0,5) : ''}`}
+                                                        {av.fecha_fin && ` · Hasta ${new Date(av.fecha_fin+'T00:00:00').toLocaleDateString('es-CO')}`}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* Logo y nombre */}
+                                    <div className="bg-white rounded-2xl shadow p-6 text-center border-t-4 border-orange-500">
+                                        <img src="Arepas.png" className="w-24 h-24 mx-auto mb-3 drop-shadow-lg" />
+                                        <h1 className="text-2xl font-bold gradient-text mb-1">{configNegocio.nombre || 'Arepas al Carbón'}</h1>
+                                        <p className="text-sm text-gray-600 leading-relaxed">{configNegocio.descripcion}</p>
+                                    </div>
+
+                                    {/* Info contacto */}
+                                    <div className="bg-white rounded-2xl shadow p-4 space-y-3">
+                                        <h3 className="font-bold text-gray-800 flex items-center gap-2">📋 Información</h3>
+                                        <div className="flex items-center gap-3 text-sm">
+                                            <span className="text-xl">🕐</span>
+                                            <div>
+                                                <p className="font-semibold text-gray-700">Horario</p>
+                                                <p className="text-gray-500">{configNegocio.horario}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-sm">
+                                            <span className="text-xl">📍</span>
+                                            <div>
+                                                <p className="font-semibold text-gray-700">Ubicación</p>
+                                                <p className="text-gray-500">{configNegocio.direccion}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Botones contacto */}
+                                    <div className={`grid gap-3 ${configNegocio.link_grupo ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                                        <a href={`https://wa.me/57${configNegocio.whatsapp}`} target="_blank"
+                                            className="bg-green-500 text-white p-3 rounded-2xl font-bold text-xs text-center shadow hover:bg-green-600 transition flex flex-col items-center gap-1">
+                                            <span className="text-2xl">💬</span>
+                                            WhatsApp
+                                        </a>
+                                        <a href={`tel:${configNegocio.telefono}`}
+                                            className="bg-blue-500 text-white p-3 rounded-2xl font-bold text-xs text-center shadow hover:bg-blue-600 transition flex flex-col items-center gap-1">
+                                            <span className="text-2xl">📞</span>
+                                            Llamar
+                                        </a>
+                                        <a href={`mailto:${configNegocio.correo}`}
+                                            className="bg-purple-500 text-white p-3 rounded-2xl font-bold text-xs text-center shadow hover:bg-purple-600 transition flex flex-col items-center gap-1">
+                                            <span className="text-2xl">✉️</span>
+                                            Correo
+                                        </a>
+                                        {configNegocio.link_grupo && (
+                                            <a href={configNegocio.link_grupo} target="_blank"
+                                                className="bg-gradient-to-r from-green-400 to-green-500 text-white p-3 rounded-2xl font-bold text-xs text-center shadow hover:from-green-500 hover:to-green-600 transition flex flex-col items-center gap-1">
+                                                <span className="text-2xl">👥</span>
+                                                Grupo
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TAB MI CUENTA */}
+                            {tabPortal === 'cuenta' && (
+                                <div className="space-y-4 fade-in">
+                                    {/* Saldo */}
+                                    <div className={`rounded-2xl shadow p-5 text-white ${totalDeuda > 0 ? 'bg-gradient-to-br from-red-500 to-red-600' : 'bg-gradient-to-br from-green-500 to-green-600'}`}>
+                                        <p className="text-sm opacity-80 mb-1">Tu saldo pendiente</p>
+                                        <p className="text-4xl font-bold">{formatCOP(totalDeuda)}</p>
+                                        <p className="text-xs opacity-70 mt-1">{totalDeuda > 0 ? `${deudas.length} entrega(s) pendiente(s)` : '✅ Todo al día'}</p>
+                                    </div>
+
+                                    {/* Puntos */}
+                                    <div className="bg-white rounded-2xl shadow p-4">
+                                        <div className="flex items-center gap-4 mb-3">
+                                            <div className="bg-amber-100 p-3 rounded-xl">
+                                                <span className="text-3xl">⭐</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-500">Puntos acumulados</p>
+                                                <p className="text-2xl font-bold text-amber-600">{clienteInfo?.puntos || 0} pts</p>
+                                                <p className="text-xs text-gray-400">Ganas {configPuntos.puntos_por_compra} pts por compras mayores a {formatCOP(configPuntos.monto_minimo)}</p>
+                                            </div>
+                                        </div>
+                                        {premios.length > 0 && (() => {
+                                            const ptsCliente = clienteInfo?.puntos || 0;
+                                            const hoyStr = new Date().toISOString().slice(0,10);
+                                            const premiosVigentes = premios.filter(p => !p.fecha_vencimiento || p.fecha_vencimiento >= hoyStr);
+                                            const proximoPremio = premiosVigentes.filter(p => p.puntos_necesarios > ptsCliente).sort((a,b) => a.puntos_necesarios - b.puntos_necesarios)[0];
+                                            // Calcular vencimiento de puntos
+                                            const ultimaVentaPagada = ventas.filter(v => v.estado_pago === 'Pagado').sort((a,b) => new Date(b.fecha) - new Date(a.fecha))[0];
+                                            const mesesVenc = configPuntos.meses_vencimiento || 3;
+                                            let fechaVencPuntos = null;
+                                            if (ultimaVentaPagada?.fecha && ptsCliente > 0) {
+                                                const d = new Date(ultimaVentaPagada.fecha);
+                                                d.setMonth(d.getMonth() + mesesVenc);
+                                                fechaVencPuntos = d;
+                                            }
+                                            const puntosVencidos = fechaVencPuntos && new Date() > fechaVencPuntos;
+                                            return (
+                                            <div>
+                                                {/* Alerta vencimiento puntos */}
+                                                {fechaVencPuntos && (
+                                                    <div className={`mb-3 p-2 rounded-xl text-xs ${puntosVencidos ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}`}>
+                                                        {puntosVencidos
+                                                            ? '⚠️ Tus puntos han vencido — ¡compra para ganar nuevos!'
+                                                            : `⏰ Tus puntos vencen el ${fechaVencPuntos.toLocaleDateString('es-CO')} — ¡no pares de comprar!`
+                                                        }
+                                                    </div>
+                                                )}
+                                                {/* Barra progreso */}
+                                                {proximoPremio && (
+                                                    <div className="mb-3">
+                                                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                            <span>Próximo: <strong>{proximoPremio.nombre}</strong></span>
+                                                            <span>{ptsCliente} / {proximoPremio.puntos_necesarios} pts</span>
+                                                        </div>
+                                                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                                            <div className="bg-amber-400 h-2.5 rounded-full transition-all"
+                                                                style={{width: `${Math.min(100, (ptsCliente / proximoPremio.puntos_necesarios) * 100)}%`}}>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <p className="text-xs font-bold text-gray-600 mb-2">🎁 Premios:</p>
+                                                <div className="space-y-2">
+                                                    {premiosVigentes.map(premio => {
+                                                        const puede = ptsCliente >= premio.puntos_necesarios;
+                                                        return (
+                                                            <div key={premio.id} className={`p-3 rounded-xl border-2 flex justify-between items-center ${puede ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+                                                                <div>
+                                                                    <p className={`font-bold text-sm ${puede ? 'text-green-700' : 'text-gray-600'}`}>{premio.nombre}</p>
+                                                                    {premio.descripcion && <p className="text-xs text-gray-400">{premio.descripcion}</p>}
+                                                                </div>
+                                                                <div className="text-right flex-shrink-0 ml-2">
+                                                                    <p className={`font-bold text-sm ${puede ? 'text-green-600' : 'text-gray-400'}`}>{premio.puntos_necesarios} pts</p>
+                                                                    {premio.fecha_vencimiento && (
+                                                                        <p className="text-xs text-orange-500 mt-0.5">Hasta {new Date(premio.fecha_vencimiento+'T00:00:00').toLocaleDateString('es-CO')}</p>
+                                                                    )}
+                                                                    {puede ? (
+                                                                        <a href={`https://wa.me/57${configNegocio.whatsapp}?text=${encodeURIComponent('Hola! 😊 Tengo ' + ptsCliente + ' puntos y quisiera canjear: *' + premio.nombre + '*. ¿Cómo lo gestiono?')}`}
+                                                                            target="_blank"
+                                                                            className="text-xs bg-green-500 text-white px-2 py-1 rounded-lg font-bold hover:bg-green-600 transition">
+                                                                            🎁 Canjear
+                                                                        </a>
+                                                                    ) : (
+                                                                        <p className="text-xs text-gray-400">Faltan {premio.puntos_necesarios - ptsCliente} pts</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    {/* Deudas por fecha */}
+                                    {Object.keys(deudasPorFecha).length > 0 && (
+                                        <div className="bg-white rounded-2xl shadow overflow-hidden">
+                                            <button onClick={() => toggleAcordeonPortal('fechas')}
+                                                className="w-full flex justify-between items-center p-4 text-left hover:bg-gray-50 transition">
+                                                <h3 className="font-bold text-gray-800 flex items-center gap-2">📅 Detalle por fecha</h3>
+                                                <span className={`text-base transition-transform duration-200 ${acordeonPortal['fechas'] ? 'rotate-180' : ''}`}>▼</span>
+                                            </button>
+                                            {acordeonPortal['fechas'] && (
+                                            <div className="px-4 pb-4">
+                                            <div className="space-y-3">
+                                                {Object.values(deudasPorFecha).map((grupo, i) => (
+                                                    <div key={i} className="border-l-4 border-red-400 pl-3 py-1">
+                                                        <p className="font-semibold text-sm text-gray-700">{grupo.label}</p>
+                                                        {grupo.ventas.map((v, vi) => (
+                                                            <div key={vi} className="mt-2 bg-gray-50 rounded-lg p-2 text-xs">
+                                                                <div className="flex justify-between mb-1">
+                                                                    <span className="text-gray-600">{v.cantidad} {v.tipo_cantidad}</span>
+                                                                    <span className="font-semibold text-gray-700">Total: {formatCOP(v.total)}</span>
+                                                                </div>
+                                                                {parseFloat(v.abono) > 0 && (
+                                                                    <div className="flex justify-between mb-1">
+                                                                        <span className="text-blue-500">Abonado</span>
+                                                                        <span className="font-semibold text-blue-500">{formatCOP(v.abono)}</span>
+                                                                    </div>
+                                                                )}
+                                                                <div className="flex justify-between border-t border-gray-200 pt-1 mt-1">
+                                                                    <span className="font-bold text-red-500">Saldo pendiente</span>
+                                                                    <span className="font-bold text-red-500">{formatCOP((parseFloat(v.total)||0)-(parseFloat(v.abono)||0))}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        <p className="text-xs font-bold text-red-600 mt-1">Total: {formatCOP(grupo.total)}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Historial compras */}
+                                    <div className="bg-white rounded-2xl shadow overflow-hidden">
+                                        <button onClick={() => toggleAcordeonPortal('historial')}
+                                            className="w-full flex justify-between items-center p-4 text-left hover:bg-gray-50 transition">
+                                            <h3 className="font-bold text-gray-800 flex items-center gap-2">📜 Historial de compras</h3>
+                                            <span className={`text-base transition-transform duration-200 ${acordeonPortal['historial'] ? 'rotate-180' : ''}`}>▼</span>
+                                        </button>
+                                        {acordeonPortal['historial'] && (
+                                        <div className="px-4 pb-4">
+                                        {ventasCliente.length === 0 ? (
+                                            <p className="text-center text-gray-400 py-4">Sin compras registradas</p>
+                                        ) : (
+                                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                                {ventasCliente.slice(0,10).map(v => (
+                                                    <div key={v.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-xl text-sm">
+                                                        <div>
+                                                            <p className="font-medium text-gray-800">{v.cantidad} {v.tipo_cantidad}</p>
+                                                            <p className="text-xs text-gray-400">{v.fecha ? new Date(v.fecha.slice(0,10)+'T00:00:00').toLocaleDateString('es-CO') : '-'}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="font-bold text-green-600">{formatCOP(v.total)}</p>
+                                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${v.estado_pago === 'Pagado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                                {v.estado_pago === 'Pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TAB CATÁLOGO */}
+                            {tabPortal === 'catalogo' && (
+                                <div className="space-y-4 fade-in">
+                                    <h2 className="text-lg font-bold text-gray-800">🛒 Nuestros Productos</h2>
+                                    {productos.length === 0 ? (
+                                        <div className="bg-white rounded-2xl shadow p-6 text-center">
+                                            <span className="text-5xl mb-3 block">🫓</span>
+                                            <p className="text-gray-400 text-sm">Sin productos disponibles</p>
+                                        </div>
+                                    ) : (
+                                        productos.map(prod => {
+                                            const opciones = prod.opciones || [];
+                                            const clienteInfo = clientes.find(c => c.id === clientePortal.cliente_id);
+                                            // Precio especial aplica al paquete del producto principal (orden=1)
+                                            const tieneEspecial = clienteInfo?.precio_especial && parseFloat(clienteInfo.precio_especial) > 0 && prod.orden === 1;
+                                            const precioPaqFinal = tieneEspecial ? parseFloat(clienteInfo.precio_especial) : prod.precio_paquete;
+                                            const precioUnidad = tieneEspecial ? (precioPaqFinal / prod.unidades_paquete) : prod.precio_unidad;
+                                            const abierto = acordeonPortal['prod_'+prod.id] === true;
+                                            return (
+                                                <div key={prod.id} className="bg-white rounded-2xl shadow overflow-hidden">
+                                                    <button onClick={() => toggleAcordeonPortal('prod_'+prod.id)}
+                                                        className="w-full text-left">
+                                                        {prod.imagen_url && (
+                                                            <img src={prod.imagen_url} alt={prod.nombre}
+                                                                className="w-full h-48 object-cover" />
+                                                        )}
+                                                        <div className="p-4 flex justify-between items-center">
+                                                            <h3 className="text-lg font-bold text-gray-800">{prod.nombre}</h3>
+                                                            <span className={`text-base ml-2 flex-shrink-0 transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`}>▼</span>
+                                                        </div>
+                                                    </button>
+                                                    {abierto && (
+                                                    <div className="px-4 pb-4">
+                                                        <p className="text-sm text-gray-500 mb-3 leading-relaxed">{prod.descripcion}</p>
+
+                                                        {/* Opciones */}
+                                                        {opciones.length > 0 && (
+                                                            <div className="mb-3">
+                                                                <p className="text-xs font-semibold text-gray-500 mb-2">Elige una opción:</p>
+                                                                <div className="flex gap-2 flex-wrap">
+                                                                    {opciones.map((op, i) => {
+                                                                        const seleccionada = opcionesSeleccionadas[prod.id] === op.nombre;
+                                                                        return (
+                                                                            <button key={i}
+                                                                                onClick={() => setOpcionesSeleccionadas(prev => ({ ...prev, [prod.id]: op.nombre }))}
+                                                                                className={`px-3 py-1.5 rounded-full text-xs font-bold transition border-2 ${seleccionada ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-50'}`}>
+                                                                                {seleccionada ? '✓ ' : ''}{op.nombre}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Precios */}
+                                                        <div className="grid grid-cols-2 gap-2 mb-4">
+                                                            <div className="bg-amber-50 p-2 rounded-xl text-center">
+                                                                <p className="text-xs text-gray-500">Por unidad</p>
+                                                                <p className="font-bold text-amber-700">{formatCOP(precioUnidad)}</p>
+                                                            </div>
+                                                            <div className={`p-2 rounded-xl text-center ${tieneEspecial ? 'bg-green-50' : 'bg-orange-50'}`}>
+                                                                <p className="text-xs text-gray-500">Paquete x{prod.unidades_paquete}{tieneEspecial ? ' ⭐' : ''}</p>
+                                                                <p className={`font-bold ${tieneEspecial ? 'text-green-700' : 'text-orange-700'}`}>{formatCOP(precioPaqFinal)}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Botón encargar */}
+                                                        <a href={`https://wa.me/57${configNegocio.whatsapp}?text=${encodeURIComponent('Hola! Quiero hacer un pedido de ' + prod.nombre + (opcionesSeleccionadas[prod.id] ? ' (' + opcionesSeleccionadas[prod.id] + ')' : '') + ' 🫓')}`}
+                                                            target="_blank"
+                                                            onClick={() => { if (opciones.length > 0 && !opcionesSeleccionadas[prod.id]) { pushToast('Por favor elige una opción primero', 'warning'); return false; } }}
+                                                            className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-xl font-bold text-sm hover:from-green-600 hover:to-green-700 transition flex items-center justify-center gap-2 shadow">
+                                                            💬 Encargar por WhatsApp
+                                                        </a>
+                                                    </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
+
+                        </div>
+
+                        {/* Barra de navegación inferior */}
+                        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 shadow-2xl">
+                            <div className="grid grid-cols-3">
+                                {[
+                                    { id: 'inicio', icon: '🏠', label: 'Inicio' },
+                                    { id: 'cuenta', icon: '💰', label: 'Mi Cuenta' },
+                                    { id: 'catalogo', icon: '🛒', label: 'Catálogo' },
+                                ].map(tab => (
+                                    <button key={tab.id} onClick={() => setTabPortal(tab.id)}
+                                        className={`py-3 flex flex-col items-center gap-0.5 transition ${tabPortal === tab.id ? 'text-orange-600 border-t-2 border-orange-500' : 'text-gray-400 hover:text-gray-600'}`}>
+                                        <span className="text-xl">{tab.icon}</span>
+                                        <span className="text-xs font-semibold">{tab.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
             if (!user) return <LoginPage onLogin={setUser} />;
 
             return (
@@ -1784,6 +2545,15 @@ const loadData = async () => {
 
                                                 <button
                                                     onClick={() => {
+                                                        setActiveTab('negocio');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'negocio' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>⚙️</span> Mi Negocio
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
                                                         setActiveTab('resumen');
                                                         setShowMenu(false);
                                                     }}
@@ -1831,6 +2601,7 @@ const loadData = async () => {
                             { id: 'contabilidad', label: 'Contabilidad', icon: '💰' },
                             { id: 'inventario', label: 'Inventario', icon: '📦' },
                             { id: 'rentabilidad', label: 'Rentabilidad', icon: '💹' },
+                            { id: 'negocio', label: 'Mi Negocio', icon: '⚙️' },
                             { id: 'resumen', label: 'Resumen', icon: '📈' }
                         ].map(tab => (
                             <button key={tab.id} onClick={() => { setActiveTab(tab.id); setFilterDate(''); setFilterEstado('Todos'); }} className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all whitespace-nowrap ${activeTab === tab.id ? darkMode ? 'border-b-4 border-orange-500 text-orange-400 bg-gray-700' : 'border-b-4 border-orange-600 text-orange-600 bg-orange-50' : darkMode ? 'text-gray-300 hover:text-orange-400 hover:bg-gray-700' : 'text-gray-600 hover:text-orange-600 hover:bg-amber-50'}`}>
@@ -2157,6 +2928,53 @@ const loadData = async () => {
                                     </form>
                                     </div>}
                                 </div>
+
+                                {/* Clientes pendientes de aprobar */}
+                                {clientesPendientes.length > 0 && (
+                                    <div className={`${darkMode ? 'bg-yellow-900/30 border-yellow-700' : 'bg-yellow-50 border-yellow-400'} border-2 rounded-2xl p-4 md:p-6`}>
+                                        <h3 className="font-bold text-yellow-700 mb-3 flex items-center gap-2">
+                                            <span>🔔</span> Clientes pendientes de aprobar ({clientesPendientes.length})
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {clientesPendientes.map(p => (
+                                                <div key={p.id} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-3 rounded-xl flex justify-between items-center`}>
+                                                    <div>
+                                                        <p className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>{p.nombre}</p>
+                                                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📱 {p.telefono}</p>
+                                                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(p.created_at).toLocaleDateString('es-CO')}</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={async () => {
+                                                            await supabaseClient.from('clientes_portal').update({ estado: 'aprobado' }).eq('id', p.id);
+                                                            enviarNotifLocal('✅ Cliente aprobado', p.nombre + ' ya puede acceder al portal');
+                                                            // Si no tiene cliente_id, crear el cliente
+                                                            if (!p.cliente_id) {
+                                                                const { data: nuevoCliente } = await supabaseClient.from('clientes').insert({ nombre: p.nombre, telefono: p.telefono, tipo_cliente: 'Individual', activo: true }).select();
+                                                                if (nuevoCliente?.[0]) await supabaseClient.from('clientes_portal').update({ cliente_id: nuevoCliente[0].id }).eq('id', p.id);
+                                                            }
+                                                            pushToast('✅ Cliente aprobado');
+                                                            // Notificar al cliente por WhatsApp
+                                                            const msg = `¡Hola ${p.nombre}! 🎉 Tu cuenta en el portal de Arepas al Carbón fue aprobada. Ya puedes ingresar con tu número ${p.telefono}. ¡Bienvenido!`;
+                                                            window.open(`https://wa.me/${p.telefono}?text=${encodeURIComponent(msg)}`, '_blank');
+                                                            loadData();
+                                                        }} className="px-3 py-2 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600 transition">
+                                                            ✅ Aprobar
+                                                        </button>
+                                                        <button onClick={async () => {
+                                                            showConfirm('Rechazar cliente', `¿Rechazar a ${p.nombre}?`, async () => {
+                                                                await supabaseClient.from('clientes_portal').update({ estado: 'rechazado' }).eq('id', p.id);
+                                                                pushToast('Cliente rechazado');
+                                                                loadData();
+                                                            });
+                                                        }} className="px-3 py-2 bg-red-500 text-white rounded-lg text-xs font-bold hover:bg-red-600 transition">
+                                                            ❌
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-3 md:p-8 rounded-2xl shadow-xl`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-4 mb-3 md:mb-6">
@@ -3665,6 +4483,507 @@ const loadData = async () => {
                             </div>
                         )}
 
+                        {activeTab === 'negocio' && (
+                            <div className="space-y-4 fade-in">
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden border-t-4 border-indigo-500`}>
+                                    <button onClick={() => toggleAcordeon('config')}
+                                        className={`w-full flex justify-between items-center p-4 md:p-5 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                                        <h3 className="font-bold text-base md:text-lg flex items-center gap-2"><span>⚙️</span> Configuración del Negocio</h3>
+                                        <span className={`text-lg transition-transform duration-200 ${acordeonNegocio['config'] ? 'rotate-180' : ''}`}>▼</span>
+                                    </button>
+                                    {acordeonNegocio['config'] && (
+                                    <div className="px-4 pb-4 md:px-6 md:pb-6">
+                                    <div className="space-y-4">
+                                        {[
+                                            { clave: 'nombre', label: '🏪 Nombre del negocio', tipo: 'text' },
+                                            { clave: 'descripcion', label: '📝 Descripción', tipo: 'textarea' },
+                                            { clave: 'whatsapp', label: '💬 WhatsApp (sin +57)', tipo: 'text' },
+                                            { clave: 'telefono', label: '📞 Teléfono de llamadas', tipo: 'text' },
+                                            { clave: 'correo', label: '✉️ Correo electrónico', tipo: 'text' },
+                                            { clave: 'horario', label: '🕐 Horario de atención', tipo: 'text' },
+                                            { clave: 'direccion', label: '📍 Dirección / Zona', tipo: 'text' },
+                                            { clave: 'link_grupo', label: '👥 Link grupo WhatsApp', tipo: 'text' },
+                                        ].map(campo => (
+                                            <div key={campo.clave}>
+                                                <label className={`block text-sm font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{campo.label}</label>
+                                                {campo.tipo === 'textarea' ? (
+                                                    <textarea
+                                                        id={`neg-${campo.clave}`}
+                                                        defaultValue={configNegocio[campo.clave] || ''}
+                                                        rows="3"
+                                                        className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500 text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}
+                                                    />
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        id={`neg-${campo.clave}`}
+                                                        defaultValue={configNegocio[campo.clave] || ''}
+                                                        className={`w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500 text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}
+                                                    />
+                                                )}
+                                            </div>
+                                        ))}
+                                        <button onClick={async () => {
+                                            setIsLoading(true);
+                                            try {
+                                                const campos = ['nombre','descripcion','whatsapp','telefono','correo','horario','direccion','link_grupo'];
+                                                for (const clave of campos) {
+                                                    const el = document.getElementById(`neg-${clave}`);
+                                                    if (el) {
+                                                        await supabaseClient.from('config_negocio')
+                                                            .upsert({ clave, valor: el.value.trim() }, { onConflict: 'clave' });
+                                                    }
+                                                }
+                                                const { data: cfgNeg } = await supabaseClient.from('config_negocio').select('*');
+                                                if (cfgNeg) {
+                                                    const cfg = {};
+                                                    cfgNeg.forEach(c => { cfg[c.clave] = c.valor; });
+                                                    setConfigNegocio(cfg);
+                                                }
+                                                pushToast('✅ Configuración guardada');
+                                            } catch(err) {
+                                                pushToast('Error al guardar', 'error');
+                                            } finally { setIsLoading(false); }
+                                        }}
+                                        className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white p-4 rounded-xl font-bold text-lg hover:from-indigo-600 hover:to-indigo-700 transition shadow-lg">
+                                            💾 Guardar Configuración
+                                        </button>
+                                    </div>
+                                    </div>
+                                    )}
+                                </div>
+
+                                {/* Notificaciones Push */}
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden border-t-4 border-amber-500`}>
+                                    <button onClick={() => toggleAcordeon('notif')}
+                                        className={`w-full flex justify-between items-center p-4 md:p-5 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                                        <h3 className="font-bold text-base md:text-lg flex items-center gap-2"><span>🔔</span> Notificaciones Push</h3>
+                                        <span className={`text-lg transition-transform duration-200 ${acordeonNegocio['notif'] ? 'rotate-180' : ''}`}>▼</span>
+                                    </button>
+                                    {acordeonNegocio['notif'] && (
+                                    <div className="px-4 pb-4 md:px-6 md:pb-6 space-y-3">
+                                        {/* Estado permiso */}
+                                        <div className={`p-3 rounded-xl flex justify-between items-center ${pushPermiso === 'granted' ? darkMode ? 'bg-green-900/30 border border-green-700' : 'bg-green-50 border border-green-300' : darkMode ? 'bg-yellow-900/30 border border-yellow-700' : 'bg-yellow-50 border border-yellow-300'}`}>
+                                            <div>
+                                                <p className={`text-sm font-bold ${pushPermiso === 'granted' ? 'text-green-600' : 'text-yellow-600'}`}>
+                                                    {pushPermiso === 'granted' ? '✅ Notificaciones activas' : '⚠️ Notificaciones desactivadas'}
+                                                </p>
+                                                <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                    {pushPermiso === 'granted' ? 'Recibirás alertas de clientes y más' : 'Actívalas para recibir alertas'}
+                                                </p>
+                                            </div>
+                                            {pushPermiso !== 'granted' && (
+                                                <button onClick={solicitarPermisoPush}
+                                                    className="px-4 py-2 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition">
+                                                    Activar
+                                                </button>
+                                            )}
+                                        </div>
+                                        {/* Horario */}
+                                        <div>
+                                            <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>🕐 Horario de notificaciones</p>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className={`block text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Desde</label>
+                                                    <input type="time" value={configNotif.hora_inicio}
+                                                        onChange={e => setConfigNotif({...configNotif, hora_inicio: e.target.value})}
+                                                        className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                                </div>
+                                                <div>
+                                                    <label className={`block text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Hasta</label>
+                                                    <input type="time" value={configNotif.hora_fin}
+                                                        onChange={e => setConfigNotif({...configNotif, hora_fin: e.target.value})}
+                                                        className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {/* Prueba */}
+                                        <button onClick={() => {
+                                            if (pushPermiso !== 'granted') { pushToast('Primero activa las notificaciones', 'error'); return; }
+                                            enviarNotifLocal('🫓 Arepas al Carbón', 'Esta es una notificación de prueba');
+                                            pushToast('✅ Notificación enviada');
+                                        }} className={`w-full p-3 rounded-xl font-bold text-sm transition ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                                            🔔 Enviar notificación de prueba
+                                        </button>
+                                    </div>
+                                    )}
+                                </div>
+
+                                {/* Avisos del día */}
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden border-t-4 border-orange-500`}>
+                                    <button onClick={() => toggleAcordeon('avisos')}
+                                        className={`w-full flex justify-between items-center p-4 md:p-5 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                                        <h3 className="font-bold text-base md:text-lg flex items-center gap-2"><span>📢</span> Avisos del Día</h3>
+                                        <span className={`text-lg transition-transform duration-200 ${acordeonNegocio['avisos'] ? 'rotate-180' : ''}`}>▼</span>
+                                    </button>
+                                    {acordeonNegocio['avisos'] && (
+                                    <div className="px-4 pb-4 md:px-6 md:pb-6">
+                                    <div className="space-y-3 mb-4">
+                                        <div>
+                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Mensaje del aviso</label>
+                                            <textarea rows="2" value={avisoForm.mensaje} onChange={e => setAvisoForm({...avisoForm, mensaje: e.target.value})}
+                                                placeholder="Ej: Hoy entregas hasta las 5pm · Mañana no hay servicio..."
+                                                className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>📅 Fecha fin (opcional)</label>
+                                                <input type="date" value={avisoForm.fecha_fin} onChange={e => setAvisoForm({...avisoForm, fecha_fin: e.target.value})}
+                                                    className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            </div>
+                                            <div>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>🕐 Hora inicio (opcional)</label>
+                                                <input type="time" value={avisoForm.hora_inicio} onChange={e => setAvisoForm({...avisoForm, hora_inicio: e.target.value})}
+                                                    className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            </div>
+                                            <div>
+                                                <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>🕐 Hora fin (opcional)</label>
+                                                <input type="time" value={avisoForm.hora_fin} onChange={e => setAvisoForm({...avisoForm, hora_fin: e.target.value})}
+                                                    className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 flex-wrap">
+                                            <button onClick={async () => {
+                                                if (!avisoForm.mensaje.trim()) { pushToast('Escribe un mensaje', 'error'); return; }
+                                                setIsLoading(true);
+                                                const payload = {
+                                                    mensaje: avisoForm.mensaje.trim(),
+                                                    fecha_fin: avisoForm.fecha_fin || null,
+                                                    hora_inicio: avisoForm.hora_inicio || null,
+                                                    hora_fin: avisoForm.hora_fin || null,
+                                                    activo: true,
+                                                };
+                                                let error;
+                                                if (avisoForm.id) {
+                                                    ({ error } = await supabaseClient.from('avisos_dia').update(payload).eq('id', avisoForm.id));
+                                                } else {
+                                                    ({ error } = await supabaseClient.from('avisos_dia').insert({ ...payload, creado_por: user?.id }));
+                                                }
+                                                setIsLoading(false);
+                                                if (!error) {
+                                                    pushToast(avisoForm.id ? '✅ Aviso actualizado' : '✅ Aviso publicado');
+                                                    setAvisoForm({ id: null, mensaje: '', fecha_fin: '', hora_inicio: '', hora_fin: '' });
+                                                    await loadData();
+                                                } else { pushToast('Error al guardar', 'error'); }
+                                            }}
+                                            className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3 rounded-xl font-bold text-sm hover:from-amber-600 hover:to-orange-600 transition">
+                                                {avisoForm.id ? '💾 Guardar cambios' : '📢 Publicar Aviso'}
+                                            </button>
+                                            {configNegocio.link_grupo && avisoForm.mensaje.trim() && (
+                                                <a href={configNegocio.link_grupo} target="_blank"
+                                                    onClick={() => navigator.clipboard?.writeText(avisoForm.mensaje.trim()).then(() => pushToast('✅ Mensaje copiado — pégalo en el grupo'))}
+                                                    className="px-4 py-3 bg-green-500 text-white rounded-xl font-bold text-sm hover:bg-green-600 transition">
+                                                    👥 Enviar al grupo
+                                                </a>
+                                            )}
+                                            {avisoForm.id && (
+                                                <button onClick={() => setAvisoForm({ id: null, mensaje: '', fecha_fin: '', hora_inicio: '', hora_fin: '' })}
+                                                    className={`px-4 py-3 rounded-xl font-bold text-sm transition ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+                                                    ✕ Cancelar
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {/* Lista de avisos */}
+                                    <div className="space-y-2">
+                                        {avisos.map(av => (
+                                            <div key={av.id} className={`p-3 rounded-xl border-2 ${av.activo ? darkMode ? 'border-amber-700 bg-amber-900/20' : 'border-amber-300 bg-amber-50' : darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-gray-50'}`}>
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <p className={`text-sm flex-1 ${darkMode ? 'text-white' : 'text-gray-800'}`}>{av.mensaje}</p>
+                                                    <div className="flex gap-1 flex-shrink-0 flex-wrap">
+                                                        {configNegocio.link_grupo && (
+                                                            <a href={`${configNegocio.link_grupo}`} target="_blank"
+                                                                onClick={() => {
+                                                                    // Copiar el mensaje al portapapeles
+                                                                    navigator.clipboard?.writeText(av.mensaje).then(() => pushToast('✅ Mensaje copiado — pégalo en el grupo'));
+                                                                }}
+                                                                className={`text-xs px-2 py-1 rounded-lg font-medium transition ${darkMode ? 'bg-green-800 text-green-200 hover:bg-green-700' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
+                                                                📢 Grupo
+                                                            </a>
+                                                        )}
+                                                        <button onClick={() => setAvisoForm({ id: av.id, mensaje: av.mensaje, fecha_fin: av.fecha_fin || '', hora_inicio: av.hora_inicio || '', hora_fin: av.hora_fin || '' })}
+                                                            className={`text-xs px-2 py-1 rounded-lg font-medium transition ${darkMode ? 'bg-blue-800 text-blue-200 hover:bg-blue-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>
+                                                            ✏️
+                                                        </button>
+                                                        <button onClick={async () => {
+                                                            await supabaseClient.from('avisos_dia').update({ activo: !av.activo }).eq('id', av.id);
+                                                            await loadData();
+                                                            pushToast(av.activo ? '⏸️ Aviso desactivado' : '✅ Aviso activado');
+                                                        }} className={`text-xs px-2 py-1 rounded-lg font-medium transition ${av.activo ? darkMode ? 'bg-yellow-800 text-yellow-200' : 'bg-yellow-100 text-yellow-700' : darkMode ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                                                            {av.activo ? '⏸️' : '▶️'}
+                                                        </button>
+                                                        <button onClick={async () => {
+                                                            showConfirm('🗑️ Eliminar aviso', '¿Eliminar este aviso?', async () => {
+                                                                await supabaseClient.from('avisos_dia').delete().eq('id', av.id);
+                                                                await loadData();
+                                                                pushToast('🗑️ Aviso eliminado');
+                                                            });
+                                                        }} className={`text-xs px-2 py-1 rounded-lg font-medium transition ${darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-700'}`}>
+                                                            🗑️
+                                                        </button>
+                                                        {configNegocio.link_grupo && (
+                                                            <a href={configNegocio.link_grupo} target="_blank"
+                                                                className={`text-xs px-2 py-1 rounded-lg font-medium transition ${darkMode ? 'bg-green-900 text-green-300 hover:bg-green-800' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                                                                title="Abrir grupo de WhatsApp">
+                                                                👥
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                    <span className={`text-xs ${av.activo ? 'text-amber-600' : darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
+                                                        {av.activo ? '✅ Activo' : '⏸️ Inactivo'}
+                                                    </span>
+                                                    {av.fecha_fin && <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>· Hasta {new Date(av.fecha_fin+'T00:00:00').toLocaleDateString('es-CO')}</span>}
+                                                    {av.hora_inicio && <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>· {av.hora_inicio.slice(0,5)}{av.hora_fin ? ' - ' + av.hora_fin.slice(0,5) : ''}</span>}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {avisos.length === 0 && <p className={`text-center py-4 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Sin avisos publicados</p>}
+                                    </div>
+                                    </div>
+                                    )}
+                                </div>
+
+                                {/* WhatsApp Masivo */}
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden border-t-4 border-green-500`}>
+                                    <button onClick={() => toggleAcordeon('whatsapp')}
+                                        className={`w-full flex justify-between items-center p-4 md:p-5 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                                        <h3 className="font-bold text-base md:text-lg flex items-center gap-2"><span>📱</span> WhatsApp al Grupo</h3>
+                                        <span className={`text-lg transition-transform duration-200 ${acordeonNegocio['whatsapp'] ? 'rotate-180' : ''}`}>▼</span>
+                                    </button>
+                                    {acordeonNegocio['whatsapp'] && (
+                                    <div className="px-4 pb-4 md:px-6 md:pb-6 space-y-3">
+                                        {!configNegocio.link_grupo ? (
+                                            <div className={`p-4 rounded-xl text-center ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} border-2 border-dashed border-gray-300`}>
+                                                <p className="text-2xl mb-2">👥</p>
+                                                <p className={`text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Sin grupo configurado</p>
+                                                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Agrega el link del grupo en Configuración del Negocio</p>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <div className={`p-3 rounded-xl flex items-center gap-3 mb-3 ${darkMode ? 'bg-green-900/30 border border-green-700' : 'bg-green-50 border border-green-300'}`}>
+                                                    <span className="text-2xl">✅</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-bold text-green-600">Grupo configurado</p>
+                                                        <p className={`text-xs truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{configNegocio.link_grupo}</p>
+                                                    </div>
+                                                    <a href={configNegocio.link_grupo} target="_blank"
+                                                        className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600 transition flex-shrink-0">
+                                                        Abrir
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {/* Redactar mensaje para el grupo */}
+                                        <div>
+                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>✍️ Redactar mensaje para el grupo</label>
+                                            <textarea rows="4" id="msg-grupo"
+                                                placeholder="Escribe tu mensaje aquí..."
+                                                className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        </div>
+                                        {/* Mensajes rápidos */}
+                                        <div>
+                                            <p className={`text-xs font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>⚡ Mensajes rápidos:</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {[
+                                                    { label: '📦 Pedidos hoy', msg: '¡Buenos días! 🫓🌽 Hoy estamos recibiendo pedidos. ¿Quién apunta? Escríbenos al privado. ¡Gracias!' },
+                                                    { label: '✅ Entrega lista', msg: '¡Hola! 🫓 Sus arepas están listas para entrega. Por favor confirmen su pedido. ¡Gracias por su preferencia!' },
+                                                    { label: '🚫 Sin servicio', msg: '⚠️ Aviso importante: Hoy no habrá servicio. Pedimos disculpas. Mañana volvemos con todo. ¡Gracias por entender!' },
+                                                    { label: '🎉 Promoción', msg: `🎉 ¡Oferta especial! Arepas al Carbón tiene una promoción exclusiva para ustedes. ¡No se la pierdan! Escríbenos para más info. 🫓🌽` },
+                                                ].map((m, i) => (
+                                                    <button key={i}
+                                                        onClick={() => { document.getElementById('msg-grupo').value = m.msg; }}
+                                                        className={`text-xs px-3 py-1.5 rounded-lg font-medium transition ${darkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                                                        {m.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {/* Botón enviar */}
+                                        <button onClick={() => {
+                                            const msg = document.getElementById('msg-grupo')?.value?.trim();
+                                            if (!msg) { pushToast('Escribe un mensaje primero', 'error'); return; }
+                                            if (!configNegocio.link_grupo) { pushToast('Configura el link del grupo primero', 'error'); return; }
+                                            navigator.clipboard?.writeText(msg).then(() => {
+                                                pushToast('📋 Mensaje copiado — pégalo en el grupo');
+                                            }).catch(() => {
+                                                pushToast('📱 Abriendo grupo...');
+                                            });
+                                            window.open(configNegocio.link_grupo, '_blank');
+                                        }}
+                                        className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-xl font-bold text-sm hover:from-green-600 hover:to-green-700 transition flex items-center justify-center gap-2">
+                                            📱 Copiar mensaje y abrir grupo
+                                        </button>
+                                    </div>
+                                    )}
+                                </div>
+
+                                {/* Config puntos y premios */}
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden border-t-4 border-yellow-500`}>
+                                    <button onClick={() => toggleAcordeon('puntos')}
+                                        className={`w-full flex justify-between items-center p-4 md:p-5 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                                        <h3 className="font-bold text-base md:text-lg flex items-center gap-2"><span>⭐</span> Puntos y Fidelidad</h3>
+                                        <span className={`text-lg transition-transform duration-200 ${acordeonNegocio['puntos'] ? 'rotate-180' : ''}`}>▼</span>
+                                    </button>
+                                    {acordeonNegocio['puntos'] && (
+                                    <div className="px-4 pb-4 md:px-6 md:pb-6">
+                                    <div className="space-y-3 mb-4">
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Compra mínima</label>
+                                                <input type="number" value={configPuntos.monto_minimo}
+                                                    onChange={e => setConfigPuntos({...configPuntos, monto_minimo: parseFloat(e.target.value)})}
+                                                    className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            </div>
+                                            <div>
+                                                <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Puntos por compra</label>
+                                                <input type="number" value={configPuntos.puntos_por_compra}
+                                                    onChange={e => setConfigPuntos({...configPuntos, puntos_por_compra: parseInt(e.target.value)})}
+                                                    className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            </div>
+                                            <div>
+                                                <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Meses hasta vencer</label>
+                                                <input type="number" min="1" value={configPuntos.meses_vencimiento || 3}
+                                                    onChange={e => setConfigPuntos({...configPuntos, meses_vencimiento: parseInt(e.target.value)})}
+                                                    className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            </div>
+                                        </div>
+                                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
+                                            ⚠️ Los puntos vencen si el cliente no compra en {configPuntos.meses_vencimiento || 3} meses
+                                        </p>
+                                        <button onClick={async () => {
+                                            await supabaseClient.from('config_puntos').update({ monto_minimo: configPuntos.monto_minimo, puntos_por_compra: configPuntos.puntos_por_compra, meses_vencimiento: configPuntos.meses_vencimiento || 3 }).eq('id', configPuntos.id);
+                                            pushToast('✅ Configuración de puntos guardada');
+                                        }} className={`w-full p-3 rounded-xl font-bold text-sm transition ${darkMode ? 'bg-amber-700 text-white hover:bg-amber-600' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
+                                            💾 Guardar configuración de puntos
+                                        </button>
+                                    </div>
+
+                                    {/* Premios */}
+                                    <p className={`text-sm font-bold mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>🎁 Premios</p>
+                                    <div className="space-y-2 mb-3">
+                                        {premios.map(p => (
+                                            <div key={p.id} className={`p-3 rounded-xl border flex justify-between items-center ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-gray-50'}`}>
+                                                <div>
+                                                    <p className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>{p.nombre}</p>
+                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{p.puntos_necesarios} pts · {p.activo ? '✅ Activo' : '❌ Inactivo'}{p.fecha_vencimiento ? ` · Hasta ${new Date(p.fecha_vencimiento+'T00:00:00').toLocaleDateString('es-CO')}` : ''}</p>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button onClick={() => setPremioForm({ id: p.id, nombre: p.nombre, descripcion: p.descripcion || '', puntos_necesarios: p.puntos_necesarios, fecha_vencimiento: p.fecha_vencimiento || '' })}
+                                                        className={`text-xs px-2 py-1 rounded-lg ${darkMode ? 'bg-blue-800 text-blue-200' : 'bg-blue-100 text-blue-700'}`}>✏️</button>
+                                                    <button onClick={async () => {
+                                                        await supabaseClient.from('premios_fidelidad').update({ activo: !p.activo }).eq('id', p.id);
+                                                        const { data: prems } = await supabaseClient.from('premios_fidelidad').select('*').order('puntos_necesarios');
+                                                        if (prems) setPremios(prems);
+                                                    }} className={`text-xs px-2 py-1 rounded-lg ${darkMode ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                                                        {p.activo ? '⏸️' : '▶️'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {/* Form nuevo/editar premio */}
+                                    <div className={`p-3 rounded-xl border-2 border-dashed space-y-2 ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}>
+                                        <p className={`text-xs font-bold ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{premioForm.id ? '✏️ Editar premio' : '➕ Nuevo premio'}</p>
+                                        <input type="text" value={premioForm.nombre} onChange={e => setPremioForm({...premioForm, nombre: e.target.value})}
+                                            placeholder="Nombre del premio"
+                                            className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        <input type="text" value={premioForm.descripcion} onChange={e => setPremioForm({...premioForm, descripcion: e.target.value})}
+                                            placeholder="Descripción (opcional)"
+                                            className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        <input type="number" value={premioForm.puntos_necesarios} onChange={e => setPremioForm({...premioForm, puntos_necesarios: e.target.value})}
+                                            placeholder="Puntos necesarios"
+                                            className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        <div>
+                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📅 Válido hasta (opcional)</label>
+                                            <input type="date" value={premioForm.fecha_vencimiento || ''} onChange={e => setPremioForm({...premioForm, fecha_vencimiento: e.target.value})}
+                                                className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={async () => {
+                                                if (!premioForm.nombre || !premioForm.puntos_necesarios) { pushToast('Completa nombre y puntos', 'error'); return; }
+                                                const payload = { nombre: premioForm.nombre, descripcion: premioForm.descripcion || null, puntos_necesarios: parseInt(premioForm.puntos_necesarios), activo: true, fecha_vencimiento: premioForm.fecha_vencimiento || null };
+                                                if (premioForm.id) {
+                                                    await supabaseClient.from('premios_fidelidad').update(payload).eq('id', premioForm.id);
+                                                } else {
+                                                    await supabaseClient.from('premios_fidelidad').insert(payload);
+                                                }
+                                                const { data: prems } = await supabaseClient.from('premios_fidelidad').select('*').order('puntos_necesarios');
+                                                if (prems) setPremios(prems);
+                                                setPremioForm({ id: null, nombre: '', descripcion: '', puntos_necesarios: '' });
+                                                pushToast(premioForm.id ? '✅ Premio actualizado' : '✅ Premio creado');
+                                            }} className="flex-1 bg-amber-500 text-white p-2 rounded-xl font-bold text-sm hover:bg-amber-600 transition">
+                                                {premioForm.id ? '💾 Guardar' : '➕ Agregar'}
+                                            </button>
+                                            {premioForm.id && <button onClick={() => setPremioForm({ id: null, nombre: '', descripcion: '', puntos_necesarios: '' })}
+                                                className={`px-4 p-2 rounded-xl font-bold text-sm ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-700'}`}>✕</button>}
+                                        </div>
+                                    </div>
+                                    </div>
+                                    )}
+                                </div>
+
+                                {/* Gestión de productos */}
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden border-t-4 border-green-500`}>
+                                    <button onClick={() => toggleAcordeon('productos')}
+                                        className={`w-full flex justify-between items-center p-4 md:p-5 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                                        <h3 className="font-bold text-base md:text-lg flex items-center gap-2"><span>🛒</span> Productos del Catálogo</h3>
+                                        <span className={`text-lg transition-transform duration-200 ${acordeonNegocio['productos'] ? 'rotate-180' : ''}`}>▼</span>
+                                    </button>
+                                    {acordeonNegocio['productos'] && (
+                                    <div className="px-4 pb-4 md:px-6 md:pb-6">
+                                    <div className="space-y-3">
+                                        {productos.map(prod => (
+                                            <div key={prod.id} className={`p-4 rounded-xl border-2 ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-gray-50'}`}>
+                                                <div className="flex gap-3">
+                                                    {prod.imagen_url && (
+                                                        <img src={prod.imagen_url} alt={prod.nombre} className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>{prod.nombre}</p>
+                                                        <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                            Unidad: {formatCOP(prod.precio_unidad)} · Paquete x{prod.unidades_paquete}: {formatCOP(prod.precio_paquete)}
+                                                        </p>
+                                                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${prod.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                {prod.activo ? '✅ Activo' : '❌ Inactivo'}
+                                                            </span>
+                                                            <button onClick={() => setModalProducto({...prod})}
+                                                                className={`text-xs px-3 py-1 rounded-lg font-medium transition ${darkMode ? 'bg-blue-800 text-blue-200 hover:bg-blue-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>
+                                                                ✏️ Editar
+                                                            </button>
+                                                            <button onClick={async () => {
+                                                                await supabaseClient.from('productos_catalogo').update({ activo: !prod.activo }).eq('id', prod.id);
+                                                                const { data: prods } = await supabaseClient.from('productos_catalogo').select('*').order('orden');
+                                                                if (prods) setProductos(prods);
+                                                                pushToast(prod.activo ? '⏸️ Producto desactivado' : '✅ Producto activado');
+                                                            }} className={`text-xs px-3 py-1 rounded-lg font-medium transition ${darkMode ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+                                                                {prod.activo ? 'Desactivar' : 'Activar'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <button onClick={() => setModalProducto({ id: null, nombre: '', descripcion: '', precio_unidad: '', precio_paquete: '', unidades_paquete: '', imagen_url: '', activo: true, opciones: [] })}
+                                            className="w-full py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-bold text-sm hover:bg-indigo-50 transition">
+                                            ➕ Agregar nuevo producto
+                                        </button>
+                                        {productos.length === 0 && (
+                                            <p className={`text-center py-4 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Sin productos registrados</p>
+                                        )}
+                                    </div>
+                                    </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {activeTab === 'resumen' && (
                             <div className="space-y-6 fade-in">
                                 <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-8 rounded-2xl shadow-xl border-t-8 border-purple-500`}>
@@ -3878,30 +5197,19 @@ const loadData = async () => {
                                     </div>
 
                                     <div className="grid grid-cols-3 gap-2 md:gap-6">
-                                        <div className="bg-gradient-to-br from-amber-500 to-orange-600 text-white p-3 md:p-6 rounded-xl md:rounded-2xl shadow-xl">
-                                            <p className="text-amber-100 text-xs md:text-sm font-medium mb-1 md:mb-2">Ventas</p>
-                                            <p className="text-base md:text-3xl font-bold">{formatCOP(resumen.totalVentas)}</p>
-                                        </div>
-                                        <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-3 md:p-6 rounded-xl md:rounded-2xl shadow-xl">
-                                            <p className="text-green-100 text-xs md:text-sm font-medium mb-1 md:mb-2">Abonos</p>
-                                            <p className="text-base md:text-3xl font-bold">{formatCOP(resumen.totalAbonos)}</p>
-                                        </div>
-                                        <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-3 md:p-6 rounded-xl md:rounded-2xl shadow-xl">
-                                            <p className="text-red-100 text-xs md:text-sm font-medium mb-1 md:mb-2">Saldo Pendiente</p>
-                                            <p className="text-base md:text-3xl font-bold">{formatCOP(resumen.totalSaldo)}</p>
-                                        </div>
-                                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-3 md:p-6 rounded-xl md:rounded-2xl shadow-xl">
-                                            <p className="text-blue-100 text-xs md:text-sm font-medium mb-1 md:mb-2">Ingresos</p>
-                                            <p className="text-base md:text-3xl font-bold">{formatCOP(resumen.totalIngresos)}</p>
-                                        </div>
-                                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-3 md:p-6 rounded-xl md:rounded-2xl shadow-xl">
-                                            <p className="text-purple-100 text-xs md:text-sm font-medium mb-1 md:mb-2">Egresos</p>
-                                            <p className="text-base md:text-3xl font-bold">{formatCOP(resumen.totalEgresos)}</p>
-                                        </div>
-                                        <div className="bg-gradient-to-br from-gray-700 to-gray-800 text-white p-3 md:p-6 rounded-xl md:rounded-2xl shadow-xl">
-                                            <p className="text-gray-300 text-xs md:text-sm font-medium mb-1 md:mb-2">Balance</p>
-                                            <p className="text-base md:text-3xl font-bold">{formatCOP(resumen.totalIngresos - resumen.totalEgresos)}</p>
-                                        </div>
+                                        {[
+                                            { label: 'Ventas', valor: resumen.totalVentas, cls: 'from-amber-500 to-orange-600', lbl: 'text-amber-100' },
+                                            { label: 'Abonos', valor: resumen.totalAbonos, cls: 'from-green-500 to-green-600', lbl: 'text-green-100' },
+                                            { label: 'Saldo', valor: resumen.totalSaldo, cls: 'from-red-500 to-red-600', lbl: 'text-red-100' },
+                                            { label: 'Ingresos', valor: resumen.totalIngresos, cls: 'from-blue-500 to-blue-600', lbl: 'text-blue-100' },
+                                            { label: 'Egresos', valor: resumen.totalEgresos, cls: 'from-purple-500 to-purple-600', lbl: 'text-purple-100' },
+                                            { label: 'Balance', valor: resumen.totalIngresos - resumen.totalEgresos, cls: 'from-gray-700 to-gray-800', lbl: 'text-gray-300' },
+                                        ].map((item, i) => (
+                                            <div key={i} className={`bg-gradient-to-br ${item.cls} text-white p-2 md:p-6 rounded-xl md:rounded-2xl shadow-xl`}>
+                                                <p className={`${item.lbl} text-xs font-medium mb-1`}>{item.label}</p>
+                                                <p className="text-xs md:text-2xl font-bold leading-tight break-all">{formatCOP(item.valor)}</p>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
 
@@ -4021,29 +5329,88 @@ const loadData = async () => {
                                                 <button onClick={() => setMostrarPerfilCliente(false)} className="text-3xl hover:text-red-500 transition">×</button>
                                             </div>
 
-                                            {/* Información básica */}
-                                            <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-6 rounded-xl mb-6`}>
-                                                <h3 className="text-lg font-bold mb-3">📋 Información</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    {clienteSeleccionado.direccion && (
+                                            {/* Información editable */}
+                                            <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-xl mb-4`}>
+                                                <h3 className="text-base font-bold mb-3 flex items-center gap-2">📋 Información del Cliente</h3>
+                                                <div className="space-y-3">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                         <div>
-                                                            <p className="text-sm text-gray-500">Dirección</p>
-                                                            <p className="font-semibold">{clienteSeleccionado.direccion}</p>
+                                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>📱 Teléfono</label>
+                                                            <input type="tel" id={`edit-tel-${clienteSeleccionado.id}`}
+                                                                defaultValue={clienteSeleccionado.telefono ? clienteSeleccionado.telefono.replace(/^57/, '') : ''}
+                                                                placeholder="Número sin 57"
+                                                                className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`} />
                                                         </div>
-                                                    )}
-                                                    {clienteSeleccionado.precio_especial && (
                                                         <div>
-                                                            <p className="text-sm text-gray-500">Precio Especial</p>
-                                                            <p className="font-semibold text-green-600">{formatCOP(clienteSeleccionado.precio_especial)}</p>
+                                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>📍 Dirección</label>
+                                                            <input type="text" id={`edit-dir-${clienteSeleccionado.id}`}
+                                                                defaultValue={clienteSeleccionado.direccion || ''}
+                                                                placeholder="Dirección"
+                                                                className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`} />
                                                         </div>
-                                                    )}
-
-                                                    {clienteSeleccionado.notas && (
-                                                        <div className="md:col-span-2">
-                                                            <p className="text-sm text-gray-500">Notas</p>
-                                                            <p className="font-semibold">{clienteSeleccionado.notas}</p>
+                                                        <div>
+                                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>💰 Precio especial paquete</label>
+                                                            <input type="number" id={`edit-precio-${clienteSeleccionado.id}`}
+                                                                defaultValue={clienteSeleccionado.precio_especial || ''}
+                                                                placeholder="Ej: 7000"
+                                                                className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`} />
                                                         </div>
-                                                    )}
+                                                        <div>
+                                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>📅 Día de entrega</label>
+                                                            <select id={`edit-dia-${clienteSeleccionado.id}`}
+                                                                defaultValue={clienteSeleccionado.dia_entrega || ''}
+                                                                className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`}>
+                                                                <option value="">Sin día</option>
+                                                                {['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map(d => (
+                                                                    <option key={d} value={d}>{d}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>👤 Tipo de cliente</label>
+                                                            <select id={`edit-tipo-${clienteSeleccionado.id}`}
+                                                                defaultValue={clienteSeleccionado.tipo_cliente || 'Individual'}
+                                                                className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`}>
+                                                                <option value="Individual">Individual</option>
+                                                                <option value="Contrato">Contrato</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>📝 Notas</label>
+                                                        <textarea id={`edit-notas-${clienteSeleccionado.id}`}
+                                                            defaultValue={clienteSeleccionado.notas || ''}
+                                                            rows="2"
+                                                            placeholder="Notas del cliente..."
+                                                            className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white border-gray-200'}`} />
+                                                    </div>
+                                                    <button onClick={async () => {
+                                                        let tel = document.getElementById(`edit-tel-${clienteSeleccionado.id}`).value.trim();
+                                                        const dir = document.getElementById(`edit-dir-${clienteSeleccionado.id}`).value.trim();
+                                                        const precio = document.getElementById(`edit-precio-${clienteSeleccionado.id}`).value.trim();
+                                                        const dia = document.getElementById(`edit-dia-${clienteSeleccionado.id}`).value;
+                                                        const tipo = document.getElementById(`edit-tipo-${clienteSeleccionado.id}`).value;
+                                                        const notas = document.getElementById(`edit-notas-${clienteSeleccionado.id}`).value.trim();
+                                                        if (tel && !tel.startsWith('57')) tel = '57' + tel;
+                                                        const payload = {
+                                                            telefono: tel || null,
+                                                            direccion: dir || null,
+                                                            precio_especial: precio ? parseFloat(precio) : null,
+                                                            dia_entrega: dia || null,
+                                                            tipo_cliente: tipo,
+                                                            notas: notas || null
+                                                        };
+                                                        const { error } = await supabaseClient.from('clientes').update(payload).eq('id', clienteSeleccionado.id);
+                                                        if (error) { pushToast('Error al guardar', 'error'); }
+                                                        else {
+                                                            setClienteSeleccionado({ ...clienteSeleccionado, ...payload });
+                                                            pushToast('✅ Cliente actualizado');
+                                                            loadData();
+                                                        }
+                                                    }}
+                                                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-xl font-bold text-sm hover:from-blue-600 hover:to-blue-700 transition">
+                                                        💾 Guardar cambios
+                                                    </button>
                                                 </div>
                                             </div>
 
@@ -4066,32 +5433,7 @@ const loadData = async () => {
                                                     <p className="text-sm md:text-lg font-bold">{formatCOP(saldoPendiente)}</p>
                                                 </div>
                                             </div>
-                                            {/* Editar Teléfono */}
-                                            <div className={`${darkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-blue-50 border-blue-200'} p-3 rounded-xl mb-4 border`}>
-                                                <p className="text-xs font-semibold text-blue-600 mb-2">📱 Teléfono</p>
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        type="tel"
-                                                        defaultValue={clienteSeleccionado.telefono ? clienteSeleccionado.telefono.replace(/^57/, '') : ''}
-                                                        placeholder="Número sin 57"
-                                                        id={`telefono-${clienteSeleccionado.id}`}
-                                                        className={`flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-blue-200'}`}
-                                                    />
-                                                    <button
-                                                        onClick={async () => {
-                                                            const input = document.getElementById(`telefono-${clienteSeleccionado.id}`);
-                                                            let nuevoTelefono = input.value.trim();
-                                                            if (!nuevoTelefono) { pushToast('Ingresa un teléfono', 'error'); return; }
-                                                            if (!nuevoTelefono.startsWith('57')) nuevoTelefono = '57' + nuevoTelefono;
-                                                            const { error } = await supabaseClient.from('clientes').update({ telefono: nuevoTelefono }).eq('id', clienteSeleccionado.id);
-                                                            if (error) { pushToast('Error al guardar', 'error'); }
-                                                            else { pushToast('✅ Teléfono actualizado'); setClienteSeleccionado({ ...clienteSeleccionado, telefono: nuevoTelefono }); loadData(); }
-                                                        }}
-                                                        className="px-3 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition text-sm">
-                                                        💾
-                                                    </button>
-                                                </div>
-                                            </div>
+
 
                                             {/* Ventas pendientes */}
                                             {ventasPendientes.length > 0 && (
@@ -4102,7 +5444,7 @@ const loadData = async () => {
                                                             <div key={v.id} className={`${darkMode ? 'bg-gray-700' : 'bg-white'} p-3 rounded-lg flex justify-between items-center`}>
                                                                 <div>
                                                                     <p className="font-semibold">{v.cantidad} {v.tipo_cantidad}</p>
-                                                                    <p className="text-sm text-gray-500">{v.fecha ? new Date(v.fecha + 'T00:00:00').toLocaleDateString('es-CO') : 'Sin fecha'}</p>
+                                                                    <p className="text-sm text-gray-500">{v.fecha ? new Date(v.fecha.slice(0,10)+'T00:00:00').toLocaleDateString('es-CO') : 'Sin fecha'}</p>
                                                                 </div>
                                                                 <div className="text-right">
                                                                     <p className="text-sm text-gray-500">Total: {formatCOP(v.total)}</p>
@@ -4116,17 +5458,23 @@ const loadData = async () => {
 
                                             {/* Historial completo */}
                                             <div>
-                                                <h3 className="text-lg font-bold mb-3">📜 Historial de Compras</h3>
+                                                <h3 className="text-lg font-bold mb-3">📜 Historial de Compras ({ventasCliente.length})</h3>
                                                 <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-hide">
-                                            {ventas.filter(v => v.estado_pago === 'Pendiente').slice(0, 6).map(v => (
-                                               <div key={v.id} className={`flex justify-between items-center p-3 ${darkMode ? 'bg-yellow-900/30' : 'bg-yellow-50'} rounded-xl transition`}>
-                                                    <div>
-                                                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>{v.clientes?.nombre}</p>
-                                                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{v.cantidad} {v.tipo_cantidad}</p>
+                                                {ventasCliente.slice(0, 10).map(v => (
+                                                    <div key={v.id} className={`flex justify-between items-center p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-xl transition`}>
+                                                        <div>
+                                                            <p className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>{v.cantidad} {v.tipo_cantidad}</p>
+                                                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{v.fecha ? new Date(v.fecha.slice(0,10)+'T00:00:00').toLocaleDateString('es-CO') : 'Sin fecha'}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>{formatCOP(v.total)}</p>
+                                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${v.estado_pago === 'Pagado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                                {v.estado_pago === 'Pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <span className="font-bold text-red-600">{formatCOP((parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0))}</span>
-                                                </div>
-                                            ))}
+                                                ))}
+                                                {ventasCliente.length === 0 && <p className="text-center py-4 text-gray-400 text-sm">Sin compras registradas</p>}
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
@@ -4672,6 +6020,101 @@ const loadData = async () => {
                             </div>
                         </div>
                     )}
+                    {/* Modal editar/crear producto */}
+                    {modalProducto && (
+                        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setModalProducto(null)}>
+                            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-bold">{modalProducto.id ? '✏️ Editar Producto' : '➕ Nuevo Producto'}</h3>
+                                    <button onClick={() => setModalProducto(null)} className="text-2xl hover:text-red-500">×</button>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Nombre</label>
+                                        <input type="text" value={modalProducto.nombre} onChange={e => setModalProducto({...modalProducto, nombre: e.target.value})}
+                                            className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                    </div>
+                                    <div>
+                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Descripción</label>
+                                        <textarea rows="4" value={modalProducto.descripcion} onChange={e => setModalProducto({...modalProducto, descripcion: e.target.value})}
+                                            className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div>
+                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Precio unidad</label>
+                                            <input type="number" value={modalProducto.precio_unidad} onChange={e => setModalProducto({...modalProducto, precio_unidad: e.target.value})}
+                                                className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        </div>
+                                        <div>
+                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Precio paquete</label>
+                                            <input type="number" value={modalProducto.precio_paquete} onChange={e => setModalProducto({...modalProducto, precio_paquete: e.target.value})}
+                                                className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        </div>
+                                        <div>
+                                            <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Und. por paquete</label>
+                                            <input type="number" value={modalProducto.unidades_paquete} onChange={e => setModalProducto({...modalProducto, unidades_paquete: e.target.value})}
+                                                className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>URL de imagen</label>
+                                        <input type="text" value={modalProducto.imagen_url} onChange={e => setModalProducto({...modalProducto, imagen_url: e.target.value})}
+                                            placeholder="https://..."
+                                            className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        {modalProducto.imagen_url && <img src={modalProducto.imagen_url} className="mt-2 w-full h-32 object-cover rounded-xl" />}
+                                    </div>
+                                    <div>
+                                        <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Opciones (ej: Con sal, Sin sal)</label>
+                                        <input type="text"
+                                            value={(modalProducto.opciones || []).map(o => o.nombre).join(', ')}
+                                            onChange={e => {
+                                                const ops = e.target.value.split(',').map(s => ({ nombre: s.trim() })).filter(o => o.nombre);
+                                                setModalProducto({...modalProducto, opciones: ops});
+                                            }}
+                                            placeholder="Con sal, Sin sal"
+                                            className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Separa las opciones con comas. Deja vacío si no hay opciones.</p>
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <button onClick={async () => {
+                                            setIsLoading(true);
+                                            try {
+                                                const payload = {
+                                                    nombre: modalProducto.nombre,
+                                                    descripcion: modalProducto.descripcion,
+                                                    precio_unidad: parseFloat(modalProducto.precio_unidad) || 0,
+                                                    precio_paquete: parseFloat(modalProducto.precio_paquete) || 0,
+                                                    unidades_paquete: parseInt(modalProducto.unidades_paquete) || 1,
+                                                    imagen_url: modalProducto.imagen_url || null,
+                                                    activo: modalProducto.activo !== false,
+                                                    opciones: modalProducto.opciones || []
+                                                };
+                                                if (modalProducto.id) {
+                                                    await supabaseClient.from('productos_catalogo').update(payload).eq('id', modalProducto.id);
+                                                } else {
+                                                    await supabaseClient.from('productos_catalogo').insert(payload);
+                                                }
+                                                const { data: prods } = await supabaseClient.from('productos_catalogo').select('*').order('orden');
+                                                if (prods) setProductos(prods);
+                                                pushToast(modalProducto.id ? '✅ Producto actualizado' : '✅ Producto creado');
+                                                setModalProducto(null);
+                                            } catch(err) {
+                                                pushToast('Error al guardar', 'error');
+                                            } finally { setIsLoading(false); }
+                                        }}
+                                        className="flex-1 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white p-3 rounded-xl font-bold text-sm hover:from-indigo-600 hover:to-indigo-700 transition">
+                                            💾 Guardar
+                                        </button>
+                                        <button onClick={() => setModalProducto(null)}
+                                            className={`px-6 p-3 rounded-xl font-bold text-sm transition ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <Toast toasts={toasts} remove={removeToast} />
                 </div>
            
