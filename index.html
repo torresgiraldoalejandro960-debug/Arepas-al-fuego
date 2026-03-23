@@ -1324,9 +1324,9 @@ const loadData = async (silencioso = false) => {
                         { data: rent }
                     ] = await Promise.all([
                         supabaseClient.from('clientes').select('*').order('created_at', { ascending: false }),
-                        supabaseClient.from('ventas').select('*, clientes(nombre)').eq('archivado', false).order('fecha', { ascending: false }).limit(300),
-                        supabaseClient.from('ingresos').select('*').eq('archivado', false).order('fecha', { ascending: false }).limit(200),
-                        supabaseClient.from('egresos').select('*').eq('archivado', false).order('fecha', { ascending: false }).limit(200),
+                        supabaseClient.from('ventas').select('*, clientes(nombre)').order('fecha', { ascending: false }).limit(500),
+                        supabaseClient.from('ingresos').select('*').order('fecha', { ascending: false }).limit(500),
+                        supabaseClient.from('egresos').select('*').order('fecha', { ascending: false }).limit(500),
                         supabaseClient.from('notas_calendario').select('*').order('fecha', { ascending: true }).limit(100),
                         supabaseClient.from('compras_materia_prima').select('*').order('fecha', { ascending: false }).limit(100),
                         supabaseClient.from('configuracion_sistema').select('*').eq('clave', 'fecha_ultimo_reinicio').single(),
@@ -1938,9 +1938,11 @@ const loadData = async (silencioso = false) => {
             }), [ventas, filterDate, filterEstado, ordenAlfabetico, ordenZA]);
             const calcularResumen = () => {
                 try {
-                    const desde = resDesde ? new Date(resDesde) : (fechaUltimoReinicio ? new Date(fechaUltimoReinicio) : new Date('2000-01-01'));
-                    const hasta = resHasta ? new Date(resHasta) : new Date();
-                    hasta.setHours(23, 59, 59, 999); // Incluir todo el día
+                    // Usar fecha local (sin conversión UTC) añadiendo T00:00:00
+                    const desdeStr = resDesde || (fechaUltimoReinicio ? fechaUltimoReinicio.slice(0,10) : '2000-01-01');
+                    const hastaStr = resHasta || new Date().toISOString().slice(0,10);
+                    const desde = new Date(desdeStr + 'T00:00:00');
+                    const hasta = new Date(hastaStr + 'T23:59:59');
 
                     const filtrarFecha = (f) => {
                         if (!f) return false;
@@ -1948,7 +1950,6 @@ const loadData = async (silencioso = false) => {
                             const fecha = new Date(f);
                             return fecha >= desde && fecha <= hasta;
                         } catch (err) {
-                            console.error('Error procesando fecha:', f, err);
                             return false;
                         }
                     };
@@ -2759,17 +2760,11 @@ const loadData = async (silencioso = false) => {
                                                     const fechaInicio = fechaUltimoReinicio || '2000-01-01';
                                                     const fechaFin = new Date().toISOString().split('T')[0];
 
-                                                    // Calcular totales del período
-                                                    const filtrarFecha = (fecha) => {
-                                                        const f = new Date(fecha);
-                                                        const inicio = new Date(fechaInicio);
-                                                        const fin = new Date(fechaFin);
-                                                        return f >= inicio && f <= fin;
-                                                    };
-
-                                                    const ventasPeriodo = ventas.filter(v => v.fecha && filtrarFecha(v.fecha) && !v.archivado);
-                                                    const ingresosPeriodo = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha) && !i.archivado);
-                                                    const egresosPeriodo = egresos.filter(e => e.fecha && filtrarFecha(e.fecha) && !e.archivado);
+                                                    // Calcular totales del período — ventas pendientes NO se archivan (saldo sigue vigente)
+                                                    const ventasPeriodo = ventas.filter(v => !v.archivado);
+                                                    const ventasArchivar = ventas.filter(v => !v.archivado && v.estado_pago === 'Pagado');
+                                                    const ingresosPeriodo = ingresos.filter(i => !i.archivado);
+                                                    const egresosPeriodo = egresos.filter(e => !e.archivado);
 
                                                     const totalVentas = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
                                                     const totalAbonos = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0);
@@ -2796,12 +2791,12 @@ const loadData = async (silencioso = false) => {
                                                         return;
                                                     }
 
-                                                    // ARCHIVAR ventas, ingresos y egresos
-                                                    const ventasIds = ventasPeriodo.map(v => v.id);
+                                                    // ARCHIVAR — ventas pendientes se quedan activas (saldo sigue vigente)
+                                                    const ventasIds = ventasArchivar.map(v => v.id);
                                                     const ingresosIds = ingresosPeriodo.map(i => i.id);
                                                     const egresosIds = egresosPeriodo.map(e => e.id);
 
-                                                    // Archivar ventas
+                                                    // Archivar solo ventas PAGADAS
                                                     if (ventasIds.length > 0) {
                                                         const { error: errorVentas } = await supabaseClient
                                                             .from('ventas')
@@ -5137,27 +5132,27 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                                         const fechaInicio = fechaUltimoReinicio || '2000-01-01';
                                                         const fechaFin = new Date().toISOString().split('T')[0];
 
-                                                        // Calcular totales del período
-                                                        const filtrarFecha = (fecha) => {
+                                                        // ✅ REINICIO SEGURO — NUNCA archiva datos, solo mueve la fecha de inicio visual
+                                                        // Calcular totales del período para guardar en historial
+                                                        const filtrarPeriodo = (fecha) => {
                                                             if (!fecha) return false;
                                                             const f = new Date(fecha);
-                                                            const inicio = new Date(fechaInicio);
-                                                            const fin = new Date(fechaFin);
+                                                            const inicio = new Date(fechaInicio.slice(0,10) + 'T00:00:00');
+                                                            const fin = new Date(fechaFin.slice(0,10) + 'T23:59:59');
                                                             return f >= inicio && f <= fin;
                                                         };
-
-                                                        const ventasPeriodo = ventas.filter(v => v.fecha && filtrarFecha(v.fecha));
-                                                        const ingresosPeriodo = ingresos.filter(i => i.fecha && filtrarFecha(i.fecha));
-                                                        const egresosPeriodo = egresos.filter(e => e.fecha && filtrarFecha(e.fecha));
+                                                        const ventasPeriodo = ventas.filter(v => filtrarPeriodo(v.fecha));
+                                                        const ingresosPeriodo = ingresos.filter(i => filtrarPeriodo(i.fecha));
+                                                        const egresosPeriodo = egresos.filter(e => filtrarPeriodo(e.fecha));
 
                                                         const totalVentas = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
                                                         const totalAbonos = ventasPeriodo.reduce((s, v) => s + (parseFloat(v.abono) || 0), 0);
                                                         const totalIngresos = ingresosPeriodo.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
                                                         const totalEgresos = egresosPeriodo.reduce((s, e) => s + (parseFloat(e.monto) || 0), 0);
                                                         const balance = totalIngresos - totalEgresos;
-
                                                         const totalSaldoPeriodo = totalVentas - totalAbonos;
-                                                        // Guardar en historial con saldo pendiente
+
+                                                        // Guardar punto de control en historial
                                                         const { error: errorHistorial } = await supabaseClient.from('historial_resumenes').insert({
                                                             fecha_inicio: fechaInicio,
                                                             fecha_fin: fechaFin,
@@ -5183,7 +5178,7 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                                             usuario_id: user?.id
                                                         }, { onConflict: 'clave,usuario_id' });
 
-                                                        // Actualizar fecha de último reinicio
+                                                        // Actualizar fecha de inicio del nuevo período
                                                         const { error: errorConfig } = await supabaseClient
                                                             .from('configuracion_sistema')
                                                             .upsert({
@@ -5212,6 +5207,25 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                                 className="px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition font-semibold shadow-lg text-sm">
                                                 <span className="hidden md:inline">🔄 Reiniciar Resumen</span>
                                                 <span className="md:hidden">🔄</span>
+                                            </button>
+                                            {/* Botón recuperación de emergencia */}
+                                            <button
+                                                onClick={async () => {
+                                                    if (!confirm('🚨 ¿Recuperar TODOS los datos archivados?\n\nEsto restaurará todas las ventas, ingresos y egresos que hayan sido archivados.\n\n¡Hazlo ahora para recuperar tus datos!')) return;
+                                                    setIsLoading(true);
+                                                    try {
+                                                        await supabaseClient.from('ventas').update({ archivado: false }).eq('archivado', true);
+                                                        await supabaseClient.from('ingresos').update({ archivado: false }).eq('archivado', true);
+                                                        await supabaseClient.from('egresos').update({ archivado: false }).eq('archivado', true);
+                                                        pushToast('✅ Todos los datos recuperados correctamente', 'success');
+                                                        await loadData();
+                                                    } catch(err) {
+                                                        pushToast('Error al recuperar datos', 'error');
+                                                    } finally { setIsLoading(false); }
+                                                }}
+                                                className="px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition font-semibold shadow-lg text-sm">
+                                                <span className="hidden md:inline">🚨 Recuperar Datos</span>
+                                                <span className="md:hidden">🚨</span>
                                             </button>
                                             {fechaUltimoReinicio && (
                                                 <button
@@ -5322,7 +5336,7 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                         {[
                                             { label: 'Ventas', valor: resumen.totalVentas, cls: 'from-amber-500 to-orange-600', lbl: 'text-amber-100' },
                                             { label: 'Abonos', valor: resumen.totalAbonos, cls: 'from-green-500 to-green-600', lbl: 'text-green-100' },
-                                            { label: 'Saldo', valor: resumen.totalSaldo, cls: 'from-red-500 to-red-600', lbl: 'text-red-100' },
+                                            { label: 'Saldo Pendiente', valor: resumen.totalSaldo, cls: 'from-red-500 to-red-600', lbl: 'text-red-100' },
                                             { label: 'Ingresos', valor: resumen.totalIngresos, cls: 'from-blue-500 to-blue-600', lbl: 'text-blue-100' },
                                             { label: 'Egresos', valor: resumen.totalEgresos, cls: 'from-purple-500 to-purple-600', lbl: 'text-purple-100' },
                                             { label: 'Balance', valor: resumen.totalIngresos - resumen.totalEgresos, cls: 'from-gray-700 to-gray-800', lbl: 'text-gray-300' },
@@ -5332,6 +5346,29 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                                 <p className="text-xs md:text-2xl font-bold leading-tight break-all">{formatCOP(item.valor)}</p>
                                             </div>
                                         ))}
+                                    </div>
+
+                                    {/* Selector de rango manual */}
+                                    <div className={`mt-4 p-3 md:p-4 rounded-xl border-2 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                                        <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>🗓️ Ajustar rango del resumen (opcional)</p>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className={`block text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Desde</label>
+                                                <input type="date" value={resDesde} onChange={e => setResDesde(e.target.value)}
+                                                    className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            </div>
+                                            <div>
+                                                <label className={`block text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Hasta</label>
+                                                <input type="date" value={resHasta} onChange={e => setResHasta(e.target.value)}
+                                                    className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            </div>
+                                        </div>
+                                        {(resDesde || resHasta) && (
+                                            <button onClick={() => { setResDesde(''); setResHasta(''); }}
+                                                className={`mt-2 w-full p-2 rounded-xl text-xs font-bold transition ${darkMode ? 'bg-gray-600 text-white hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+                                                🔄 Volver al período actual
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -5347,7 +5384,7 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                                     <span className="font-bold text-green-500">{formatCOP(resumen.totalAbonos)}</span>
                                                 </div>
                                                 <div className="flex justify-between text-xs md:text-sm">
-                                                    <span className={darkMode ? 'text-blue-300' : 'text-blue-700'}>Por cobrar:</span>
+                                                    <span className={darkMode ? 'text-blue-300' : 'text-blue-700'}>Saldo pendiente:</span>
                                                     <span className="font-bold text-red-500">{formatCOP(resumen.totalSaldo)}</span>
                                                 </div>
                                                 <div className={`pt-1 md:pt-2 border-t-2 ${darkMode ? 'border-blue-700' : 'border-blue-300'}`}>
