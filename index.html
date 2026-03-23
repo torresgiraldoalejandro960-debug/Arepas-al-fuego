@@ -4208,16 +4208,43 @@ const loadData = async (silencioso = false) => {
                                                 <p className="text-center py-8 text-gray-400">Sin movimientos registrados</p>
                                             ) : movimientos.map(mov => (
                                                 <div key={mov.id} className={`flex justify-between items-center p-3 rounded-xl border-l-4 ${mov.tipo === 'entrada' ? darkMode ? 'bg-green-900/30 border-green-500' : 'bg-green-50 border-green-500' : darkMode ? 'bg-orange-900/30 border-orange-500' : 'bg-orange-50 border-orange-500'}`}>
-                                                    <div>
+                                                    <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${mov.tipo === 'entrada' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>{mov.tipo === 'entrada' ? '➕' : '➖'}</span>
+                                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${mov.tipo === 'entrada' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>{mov.tipo === 'entrada' ? '➕' : '➖'}</span>
                                                             <p className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>{mov.inventario?.nombre || 'Producto'}</p>
                                                         </div>
                                                         <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{mov.concepto} · {mov.fecha ? new Date(mov.fecha + 'T00:00:00').toLocaleDateString('es-CO') : ''}</p>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className={`font-bold text-sm ${mov.tipo === 'entrada' ? 'text-green-500' : 'text-orange-500'}`}>{mov.tipo === 'entrada' ? '+' : '-'}{parseFloat(mov.cantidad).toFixed(2)} {mov.inventario?.unidad_uso}</p>
-                                                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{formatCOP(mov.costo_calculado)}</p>
+                                                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                                                        <div className="text-right">
+                                                            <p className={`font-bold text-sm ${mov.tipo === 'entrada' ? 'text-green-500' : 'text-orange-500'}`}>{mov.tipo === 'entrada' ? '+' : '-'}{parseFloat(mov.cantidad).toFixed(2)} {mov.inventario?.unidad_uso}</p>
+                                                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{formatCOP(mov.costo_calculado)}</p>
+                                                        </div>
+                                                        <button onClick={() => {
+                                                            const esEntrada = mov.tipo === 'entrada';
+                                                            showConfirm(
+                                                                '↩️ Deshacer movimiento',
+                                                                `¿Deshacer este ${esEntrada ? 'entrada' : 'uso'} de ${parseFloat(mov.cantidad).toFixed(2)} ${mov.inventario?.unidad_uso || ''} de ${mov.inventario?.nombre || 'producto'}?
+
+Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
+                                                                async () => {
+                                                                    const item = inventario.find(i => i.id === mov.inventario_id);
+                                                                    if (!item) { pushToast('Producto no encontrado', 'error'); return; }
+                                                                    const cantActual = parseFloat(item.cantidad_disponible) || 0;
+                                                                    // Si era entrada, restar. Si era salida, sumar
+                                                                    const nuevaCantidad = esEntrada
+                                                                        ? Math.max(0, cantActual - parseFloat(mov.cantidad))
+                                                                        : cantActual + parseFloat(mov.cantidad);
+                                                                    await supabaseClient.from('inventario').update({ cantidad_disponible: nuevaCantidad }).eq('id', item.id);
+                                                                    await supabaseClient.from('movimientos_inventario').delete().eq('id', mov.id);
+                                                                    pushToast(`✅ Movimiento deshecho — ${item.nombre} ahora tiene ${nuevaCantidad.toFixed(2)} ${item.unidad_uso}`);
+                                                                    await loadData(true);
+                                                                }
+                                                            );
+                                                        }} className={`p-1.5 rounded-lg text-xs transition flex-shrink-0 ${darkMode ? 'bg-gray-600 text-gray-300 hover:bg-red-800 hover:text-red-200' : 'bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600'}`}
+                                                        title="Deshacer este movimiento">
+                                                            ↩️
+                                                        </button>
                                                     </div>
                                                 </div>
                                             ))}
@@ -4903,6 +4930,60 @@ const loadData = async (silencioso = false) => {
                                         }} className={`w-full p-3 rounded-xl font-bold text-sm transition ${darkMode ? 'bg-amber-700 text-white hover:bg-amber-600' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
                                             💾 Guardar configuración de puntos
                                         </button>
+                                    </div>
+
+                                    {/* Puntos por cliente */}
+                                    <div className={`p-3 rounded-xl border-2 mb-4 ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-gray-50'}`}>
+                                        <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>✂️ Descontar puntos al canjear premio</p>
+                                        <div className="flex gap-2">
+                                            <select id="pts-cliente-select"
+                                                className={`flex-1 p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white text-gray-900 border-gray-200'}`}>
+                                                <option value="">Selecciona cliente</option>
+                                                {clientes.filter(c => c.activo !== false && (c.puntos || 0) > 0)
+                                                    .sort((a,b) => (b.puntos||0) - (a.puntos||0))
+                                                    .map(c => (
+                                                    <option key={c.id} value={c.id}>{c.nombre} — {c.puntos || 0} pts</option>
+                                                ))}
+                                            </select>
+                                            <input type="number" id="pts-descontar" placeholder="Pts"
+                                                className={`w-20 p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            <button onClick={async () => {
+                                                const clienteId = parseInt(document.getElementById('pts-cliente-select').value);
+                                                const ptsDescontar = parseInt(document.getElementById('pts-descontar').value);
+                                                if (!clienteId || !ptsDescontar || ptsDescontar <= 0) { pushToast('Selecciona cliente y puntos', 'error'); return; }
+                                                const clienteActual = clientes.find(c => c.id === clienteId);
+                                                const ptsActuales = clienteActual?.puntos || 0;
+                                                if (ptsDescontar > ptsActuales) { pushToast(`Solo tiene ${ptsActuales} puntos`, 'error'); return; }
+                                                showConfirm('✂️ Descontar puntos', `¿Descontar ${ptsDescontar} pts a ${clienteActual.nombre}? Le quedarán ${ptsActuales - ptsDescontar} pts.`, async () => {
+                                                    const nuevosPuntos = ptsActuales - ptsDescontar;
+                                                    await supabaseClient.from('clientes').update({ puntos: nuevosPuntos }).eq('id', clienteId);
+                                                    pushToast(`✅ ${ptsDescontar} puntos descontados a ${clienteActual.nombre}`);
+                                                    await loadData(true);
+                                                });
+                                            }} className="px-3 py-2 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 transition">
+                                                ✂️
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Tabla de puntos por cliente */}
+                                    <div className="mb-4">
+                                        <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>⭐ Puntos acumulados por cliente</p>
+                                        <div className={`rounded-xl border-2 overflow-hidden ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                            <div className="max-h-48 overflow-y-auto scrollbar-hide">
+                                                {clientes.filter(c => c.activo !== false && (c.puntos || 0) > 0)
+                                                    .sort((a,b) => (b.puntos||0) - (a.puntos||0))
+                                                    .map(c => (
+                                                    <div key={c.id} className={`flex justify-between items-center px-3 py-2 border-b ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-100 hover:bg-gray-50'} transition`}>
+                                                        <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>{c.nombre}</p>
+                                                        <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${darkMode ? 'bg-amber-900 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>⭐ {c.puntos || 0} pts</span>
+                                                    </div>
+                                                ))}
+                                                {clientes.filter(c => c.activo !== false && (c.puntos || 0) > 0).length === 0 && (
+                                                    <p className="text-center py-4 text-sm text-gray-400">Ningún cliente tiene puntos aún</p>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* Premios */}
