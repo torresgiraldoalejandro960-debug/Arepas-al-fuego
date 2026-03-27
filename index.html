@@ -969,6 +969,14 @@
             const [rentFecha, setRentFecha] = useState(new Date().toISOString().slice(0, 10));
             const [rentInsumos, setRentInsumos] = useState([]);
             const [rentNotas, setRentNotas] = useState('');
+            // Carrito y pedidos portal cliente
+            const [carrito, setCarrito] = useState([]);
+            const [pedidosPortal, setPedidosPortal] = useState([]);
+            const [modalCarrito, setModalCarrito] = useState(null);
+            const [carritoForm, setCarritoForm] = useState({ tipo: 'Unidades', cantidad: '', opcion: '' });
+            const [pedidosAdmin, setPedidosAdmin] = useState([]);
+            const [modalEditarPedido, setModalEditarPedido] = useState(null);
+            const [ventaProductoId, setVentaProductoId] = useState('');
 
             // Solicitar permiso push
             const solicitarPermisoPush = async () => {
@@ -1228,6 +1236,9 @@
                         .or(`fecha_fin.is.null,fecha_fin.gte.${hoy}`)
                         .order('created_at', { ascending: false });
                     if (avs) setAvisos(avs);
+                    // Cargar pedidos del cliente
+                    const { data: pedCliente } = await supabaseClient.from("pedidos_portal").select("*").eq("cliente_portal_id", clientePortal.id).order("created_at", { ascending: false });
+                    if (pedCliente) setPedidosPortal(pedCliente);
                 };
                 cargarPortal();
             }, [modoAcceso, clientePortal?.id]);
@@ -1367,6 +1378,9 @@ const loadData = async (silencioso = false) => {
                     // Cargar clientes pendientes del portal
                     const { data: pendientes } = await supabaseClient.from('clientes_portal').select('*').eq('estado', 'pendiente').order('created_at', { ascending: false });
                     setClientesPendientes(pendientes || []);
+                    // Cargar pedidos del portal para admin
+                    const { data: pedPortal } = await supabaseClient.from("pedidos_portal").select("*, clientes_portal(nombre, telefono), clientes(nombre)").order("created_at", { ascending: false }).limit(100);
+                    setPedidosAdmin(pedPortal || []);
                     if (pendientes && pendientes.length > 0) {
                         enviarNotifLocal('🔔 Arepas al Carbón', `Tienes ${pendientes.length} cliente(s) esperando aprobación`);
                     }
@@ -1445,11 +1459,15 @@ const loadData = async (silencioso = false) => {
             useEffect(() => {
                 if (ventaForm.cantidad && ventaForm.tipo_cantidad) {
                     const cantidad = parseInt(ventaForm.cantidad) || 0;
-                    const precioUnitario = ventaForm.tipo_cantidad === 'Unidades' ? precioUnidad : precioPaquete;
+                    // Si hay producto seleccionado del catálogo, usar sus precios
+                    const prodSel = ventaProductoId ? productos.find(p => String(p.id) === ventaProductoId) : null;
+                    const precioUnitario = prodSel
+                        ? (ventaForm.tipo_cantidad === 'Unidades' ? prodSel.precio_unidad : prodSel.precio_paquete)
+                        : (ventaForm.tipo_cantidad === 'Unidades' ? precioUnidad : precioPaquete);
                     const sugerido = cantidad * precioUnitario;
                     setVentaForm(v => ({ ...v, precio_unitario: precioUnitario, precio_sugerido: sugerido }));
                 }
-            }, [ventaForm.cantidad, ventaForm.tipo_cantidad, precioUnidad, precioPaquete]);
+            }, [ventaForm.cantidad, ventaForm.tipo_cantidad, precioUnidad, precioPaquete, ventaProductoId, productos]);
 
             const addVenta = async (e) => {
                 e.preventDefault();
@@ -1476,7 +1494,7 @@ const loadData = async (silencioso = false) => {
                         fecha: fechaISO,
                         payment_type: ventaForm.payment_type,
                         abono: abono,
-                        notas: ventaForm.notas || null,
+                        notas: [ventaProductoId ? '🛍️ ' + (productos.find(p => String(p.id) === ventaProductoId)?.nombre || '') : '', ventaForm.notas || ''].filter(Boolean).join(' — ') || null,
                         usuario_id: user?.id
                     };
 
@@ -1514,8 +1532,8 @@ const loadData = async (silencioso = false) => {
                         }).select();
                     }
 
-                    // Acumular puntos si la venta supera el monto mínimo
-                    if (total >= (configPuntos.monto_minimo || 12000)) {
+                    // Acumular puntos SOLO si la venta está pagada y supera el monto mínimo
+                    if (ventaForm.estado_pago === 'Pagado' && total >= (configPuntos.monto_minimo || 12000)) {
                         const ptsGanar = configPuntos.puntos_por_compra || 50;
                         const clienteActual = clientes.find(c => c.id === parseInt(ventaForm.cliente_id));
                         if (clienteActual) {
@@ -1524,6 +1542,7 @@ const loadData = async (silencioso = false) => {
                         }
                     }
                     pushToast('✅ Venta registrada');
+                    setVentaProductoId('');
                     setVentaForm({
                         cliente_id: '', semana: '', tipo_venta: 'Individual', cantidad: '',
                         tipo_cantidad: 'Unidades', precio_unitario: '', precio_sugerido: '',
@@ -2323,9 +2342,18 @@ const loadData = async (silencioso = false) => {
                             )}
 
                             {/* TAB CATÁLOGO */}
+                            {/* TAB CATÁLOGO */}
                             {tabPortal === 'catalogo' && (
                                 <div className="space-y-4 fade-in">
-                                    <h2 className="text-lg font-bold text-gray-800">🛒 Nuestros Productos</h2>
+                                    <div className="flex justify-between items-center">
+                                        <h2 className="text-lg font-bold text-gray-800">🛒 Nuestros Productos</h2>
+                                        {carrito.length > 0 && (
+                                            <button onClick={() => setTabPortal('carrito')}
+                                                className="bg-orange-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 shadow">
+                                                🛒 Ver carrito ({carrito.length})
+                                            </button>
+                                        )}
+                                    </div>
                                     {productos.length === 0 ? (
                                         <div className="bg-white rounded-2xl shadow p-6 text-center">
                                             <span className="text-5xl mb-3 block">🫓</span>
@@ -2335,68 +2363,39 @@ const loadData = async (silencioso = false) => {
                                         productos.map(prod => {
                                             const opciones = prod.opciones || [];
                                             const clienteInfo = clientes.find(c => c.id === clientePortal.cliente_id);
-                                            // Precio especial aplica al paquete del producto principal (orden=1)
                                             const tieneEspecial = clienteInfo?.precio_especial && parseFloat(clienteInfo.precio_especial) > 0 && prod.orden === 1;
                                             const precioPaqFinal = tieneEspecial ? parseFloat(clienteInfo.precio_especial) : prod.precio_paquete;
-                                            const precioUnidad = tieneEspecial ? (precioPaqFinal / prod.unidades_paquete) : prod.precio_unidad;
-                                            const abierto = acordeonPortal['prod_'+prod.id] === true;
+                                            const precioUnd = tieneEspecial ? (precioPaqFinal / prod.unidades_paquete) : prod.precio_unidad;
+                                            const enCarrito = carrito.filter(i => i.prod_id === prod.id).reduce((s,i) => s + i.cantidad, 0);
                                             return (
                                                 <div key={prod.id} className="bg-white rounded-2xl shadow overflow-hidden">
-                                                    <button onClick={() => toggleAcordeonPortal('prod_'+prod.id)}
-                                                        className="w-full text-left">
-                                                        {prod.imagen_url && (
-                                                            <img src={prod.imagen_url} alt={prod.nombre}
-                                                                loading="lazy" className="w-full h-48 object-cover" />
-                                                        )}
-                                                        <div className="p-4 flex justify-between items-center">
-                                                            <h3 className="text-lg font-bold text-gray-800">{prod.nombre}</h3>
-                                                            <span className={`text-base ml-2 flex-shrink-0 transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`}>▼</span>
-                                                        </div>
-                                                    </button>
-                                                    {abierto && (
-                                                    <div className="px-4 pb-4">
-                                                        <p className="text-sm text-gray-500 mb-3 leading-relaxed">{prod.descripcion}</p>
-
-                                                        {/* Opciones */}
-                                                        {opciones.length > 0 && (
-                                                            <div className="mb-3">
-                                                                <p className="text-xs font-semibold text-gray-500 mb-2">Elige una opción:</p>
-                                                                <div className="flex gap-2 flex-wrap">
-                                                                    {opciones.map((op, i) => {
-                                                                        const seleccionada = opcionesSeleccionadas[prod.id] === op.nombre;
-                                                                        return (
-                                                                            <button key={i}
-                                                                                onClick={() => setOpcionesSeleccionadas(prev => ({ ...prev, [prod.id]: op.nombre }))}
-                                                                                className={`px-3 py-1.5 rounded-full text-xs font-bold transition border-2 ${seleccionada ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-50'}`}>
-                                                                                {seleccionada ? '✓ ' : ''}{op.nombre}
-                                                                            </button>
-                                                                        );
-                                                                    })}
-                                                                </div>
+                                                    {prod.imagen_url && <img src={prod.imagen_url} alt={prod.nombre} loading="lazy" className="w-full h-40 object-cover" />}
+                                                    <div className="p-4">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div>
+                                                                <h3 className="text-base font-bold text-gray-800">{prod.nombre}</h3>
+                                                                {prod.descripcion && <p className="text-xs text-gray-500 mt-0.5">{prod.descripcion}</p>}
                                                             </div>
-                                                        )}
-
-                                                        {/* Precios */}
-                                                        <div className="grid grid-cols-2 gap-2 mb-4">
+                                                            {enCarrito > 0 && <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">{enCarrito} en carrito</span>}
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-2 mb-3">
                                                             <div className="bg-amber-50 p-2 rounded-xl text-center">
                                                                 <p className="text-xs text-gray-500">Por unidad</p>
-                                                                <p className="font-bold text-amber-700">{formatCOP(precioUnidad)}</p>
+                                                                <p className="font-bold text-amber-700 text-sm">{formatCOP(precioUnd)}</p>
                                                             </div>
                                                             <div className={`p-2 rounded-xl text-center ${tieneEspecial ? 'bg-green-50' : 'bg-orange-50'}`}>
-                                                                <p className="text-xs text-gray-500">Paquete x{prod.unidades_paquete}{tieneEspecial ? ' ⭐' : ''}</p>
-                                                                <p className={`font-bold ${tieneEspecial ? 'text-green-700' : 'text-orange-700'}`}>{formatCOP(precioPaqFinal)}</p>
+                                                                <p className="text-xs text-gray-500">Paq x{prod.unidades_paquete}{tieneEspecial ? ' ⭐' : ''}</p>
+                                                                <p className={`font-bold text-sm ${tieneEspecial ? 'text-green-700' : 'text-orange-700'}`}>{formatCOP(precioPaqFinal)}</p>
                                                             </div>
                                                         </div>
-
-                                                        {/* Botón encargar */}
-                                                        <a href={`https://wa.me/57${configNegocio.whatsapp}?text=${encodeURIComponent('Hola! Quiero hacer un pedido de ' + prod.nombre + (opcionesSeleccionadas[prod.id] ? ' (' + opcionesSeleccionadas[prod.id] + ')' : '') + ' 🫓')}`}
-                                                            target="_blank"
-                                                            onClick={() => { if (opciones.length > 0 && !opcionesSeleccionadas[prod.id]) { pushToast('Por favor elige una opción primero', 'warning'); return false; } }}
-                                                            className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-xl font-bold text-sm hover:from-green-600 hover:to-green-700 transition flex items-center justify-center gap-2 shadow">
-                                                            💬 Encargar por WhatsApp
-                                                        </a>
+                                                        <button onClick={() => {
+                                                            setModalCarrito({ prod, precioUnd, precioPaqFinal });
+                                                            setCarritoForm({ tipo: 'Unidades', cantidad: '', opcion: opciones.length > 0 ? opciones[0].nombre : '' });
+                                                        }}
+                                                            className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white p-3 rounded-xl font-bold text-sm hover:from-orange-600 hover:to-orange-700 transition shadow">
+                                                            ➕ Agregar al carrito
+                                                        </button>
                                                     </div>
-                                                    )}
                                                 </div>
                                             );
                                         })
@@ -2404,20 +2403,266 @@ const loadData = async (silencioso = false) => {
                                 </div>
                             )}
 
+                            {/* TAB CARRITO */}
+                            {tabPortal === 'carrito' && (
+                                <div className="space-y-4 fade-in">
+                                    <h2 className="text-lg font-bold text-gray-800">🛒 Mi Carrito</h2>
+                                    {carrito.length === 0 ? (
+                                        <div className="bg-white rounded-2xl shadow p-8 text-center">
+                                            <span className="text-5xl mb-3 block">🛒</span>
+                                            <p className="text-gray-500 font-semibold mb-2">Tu carrito está vacío</p>
+                                            <button onClick={() => setTabPortal('catalogo')} className="bg-orange-500 text-white px-6 py-2 rounded-xl font-bold text-sm">Ver Catálogo</button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="space-y-3">
+                                                {carrito.map((item, idx) => (
+                                                    <div key={idx} className="bg-white rounded-2xl shadow p-4 flex justify-between items-center">
+                                                        <div className="flex-1">
+                                                            <p className="font-bold text-gray-800 text-sm">{item.nombre}</p>
+                                                            {item.opcion && <p className="text-xs text-amber-600 font-semibold">{item.opcion}</p>}
+                                                            <p className="text-xs text-gray-500">{item.cantidad} {item.tipo} · {formatCOP(item.precio_unitario)} c/u</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <p className="font-bold text-green-600">{formatCOP(item.subtotal)}</p>
+                                                            <button onClick={() => setCarrito(c => c.filter((_,i) => i !== idx))}
+                                                                className="text-red-400 hover:text-red-600 text-lg font-bold">×</button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4 rounded-2xl shadow">
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <span className="font-bold">Total del pedido</span>
+                                                    <span className="text-2xl font-bold">{formatCOP(carrito.reduce((s,i) => s + i.subtotal, 0))}</span>
+                                                </div>
+                                                <textarea id="notas-carrito" placeholder="Notas adicionales (opcional)..." rows="2"
+                                                    className="w-full p-2 rounded-xl text-sm text-gray-800 mb-3 bg-white" />
+                                                <button onClick={async (e) => {
+                                                    const btn = e.currentTarget;
+                                                    if (btn.disabled) return;
+                                                    btn.disabled = true;
+                                                    const notas = document.getElementById('notas-carrito')?.value?.trim() || '';
+                                                    const total = carrito.reduce((s,i) => s + i.subtotal, 0);
+                                                    const { error } = await supabaseClient.from('pedidos_portal').insert({
+                                                        cliente_portal_id: clientePortal.id,
+                                                        cliente_id: clientePortal.cliente_id || null,
+                                                        items: carrito,
+                                                        total,
+                                                        estado: 'pendiente',
+                                                        notas: notas || null
+                                                    });
+                                                    if (error) { pushToast('Error al enviar pedido: ' + error.message, 'error'); btn.disabled = false; return; }
+                                                    // Mensaje WhatsApp
+                                                    let msg = `Hola! 🫓 Soy *${clientePortal.nombre}* y quiero hacer el siguiente pedido:\n\n`;
+                                                    carrito.forEach(item => {
+                                                        msg += `• *${item.nombre}*${item.opcion ? ' (' + item.opcion + ')' : ''}\n`;
+                                                        msg += `  ${item.cantidad} ${item.tipo} → ${formatCOP(item.subtotal)}\n`;
+                                                    });
+                                                    msg += `\n💰 *TOTAL: ${formatCOP(total)}*`;
+                                                    if (notas) msg += `\n📝 Notas: ${notas}`;
+                                                    msg += `\n\n¡Gracias! 😊`;
+                                                    setCarrito([]);
+                                                    pushToast('✅ Pedido enviado');
+                                                    const { data: ped } = await supabaseClient.from('pedidos_portal').select('*').eq('cliente_portal_id', clientePortal.id).order('created_at', { ascending: false }).limit(20);
+                                                    if (ped) setPedidosPortal(ped);
+                                                    setTabPortal('pedidos');
+                                                    window.open(`https://wa.me/57${configNegocio.whatsapp}?text=${encodeURIComponent(msg)}`, '_blank');
+                                                }}
+                                                    className="w-full bg-white text-orange-600 p-3 rounded-xl font-bold text-sm hover:bg-orange-50 transition flex items-center justify-center gap-2">
+                                                    📱 Enviar pedido por WhatsApp
+                                                </button>
+                                            </div>
+                                            <button onClick={() => setTabPortal('catalogo')}
+                                                className="w-full bg-gray-100 text-gray-600 p-3 rounded-xl font-bold text-sm">
+                                                ← Seguir comprando
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* TAB MIS PEDIDOS */}
+                            {tabPortal === 'pedidos' && (
+                                <div className="space-y-4 fade-in">
+                                    <div className="flex justify-between items-center">
+                                        <h2 className="text-lg font-bold text-gray-800">📦 Mis Pedidos</h2>
+                                        <button onClick={async () => {
+                                            const { data: ped } = await supabaseClient.from('pedidos_portal').select('*').eq('cliente_portal_id', clientePortal.id).order('created_at', { ascending: false }).limit(20);
+                                            if (ped) setPedidosPortal(ped);
+                                        }} className="text-xs text-orange-500 font-bold">🔄 Actualizar</button>
+                                    </div>
+                                    {pedidosPortal.length === 0 ? (
+                                        <div className="bg-white rounded-2xl shadow p-8 text-center">
+                                            <span className="text-5xl mb-3 block">📦</span>
+                                            <p className="text-gray-500 font-semibold">Sin pedidos aún</p>
+                                            <button onClick={() => setTabPortal('catalogo')} className="mt-3 bg-orange-500 text-white px-6 py-2 rounded-xl font-bold text-sm">Hacer un pedido</button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {pedidosPortal.map(ped => {
+                                                const estadoClr = ped.estado === 'aceptado' ? 'bg-green-100 text-green-700' : ped.estado === 'cancelado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700';
+                                                const estadoIcon = ped.estado === 'aceptado' ? '✅' : ped.estado === 'cancelado' ? '❌' : '⏳';
+                                                return (
+                                                    <div key={ped.id} className="bg-white rounded-2xl shadow p-4">
+                                                        <div className="flex justify-between items-start mb-3">
+                                                            <div>
+                                                                <p className="text-xs text-gray-400">{new Date(ped.created_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}</p>
+                                                                <p className="font-bold text-green-600 text-lg">{formatCOP(ped.total)}</p>
+                                                            </div>
+                                                            <span className={`text-xs font-bold px-3 py-1 rounded-full ${estadoClr}`}>{estadoIcon} {ped.estado.charAt(0).toUpperCase() + ped.estado.slice(1)}</span>
+                                                        </div>
+                                                        <div className="space-y-1 mb-3">
+                                                            {(ped.items || []).map((item, i) => (
+                                                                <p key={i} className="text-xs text-gray-600">• {item.nombre}{item.opcion ? ' ('+item.opcion+')' : ''} — {item.cantidad} {item.tipo} · {formatCOP(item.subtotal)}</p>
+                                                            ))}
+                                                        </div>
+                                                        {ped.notas && <p className="text-xs text-gray-500 italic mb-2">📝 {ped.notas}</p>}
+                                                        {ped.estado === 'aceptado' && (
+                                                            <div className="bg-green-50 border border-green-200 rounded-xl p-2 mb-2 flex justify-between items-center">
+                                                                <p className="text-xs text-green-700 font-bold">🎉 ¡Pedido aceptado! Pronto te lo llevamos.</p>
+                                                                <button onClick={async () => {
+                                                                    if (!confirm('¿Eliminar este pedido de tu historial?')) return;
+                                                                    await supabaseClient.from('pedidos_portal').delete().eq('id', ped.id);
+                                                                    setPedidosPortal(prev => prev.filter(p => p.id !== ped.id));
+                                                                    pushToast('Pedido eliminado del historial');
+                                                                }} className="text-xs text-red-400 hover:text-red-600 font-bold ml-2 flex-shrink-0">
+                                                                    🗑️ Eliminar
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {ped.estado === 'pendiente' && (
+                                                            <div className="flex gap-2">
+                                                                <button onClick={() => setTabPortal('catalogo')}
+                                                                    className="flex-1 bg-orange-100 text-orange-700 p-2 rounded-xl text-xs font-bold">
+                                                                    ➕ Agregar más
+                                                                </button>
+                                                                <button onClick={async () => {
+                                                                    const motivo = prompt('¿Por qué deseas cancelar este pedido?');
+                                                                    if (!motivo) return;
+                                                                    await supabaseClient.from('pedidos_portal').update({ estado: 'cancelado', motivo_cancelacion: motivo }).eq('id', ped.id);
+                                                                    const msg = `Hola! 😔 Quisiera cancelar mi pedido #${ped.id}.\n\n*Motivo:* ${motivo}\n\nPedido original:\n${(ped.items||[]).map(i => '• '+i.nombre+(i.opcion?' ('+i.opcion+')':'')+' — '+i.cantidad+' '+i.tipo).join('\n')}\n\nTotal: ${formatCOP(ped.total)}\n\nGracias por entender 🙏`;
+                                                                    window.open(`https://wa.me/57${configNegocio.whatsapp}?text=${encodeURIComponent(msg)}`, '_blank');
+                                                                    const { data: newPed } = await supabaseClient.from('pedidos_portal').select('*').eq('cliente_portal_id', clientePortal.id).order('created_at', { ascending: false }).limit(20);
+                                                                    if (newPed) setPedidosPortal(newPed);
+                                                                    pushToast('Pedido cancelado');
+                                                                }}
+                                                                    className="flex-1 bg-red-100 text-red-700 p-2 rounded-xl text-xs font-bold">
+                                                                    ❌ Cancelar
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                         </div>
+
+                        {/* Modal agregar al carrito */}
+                        {modalCarrito && (
+                            <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50" onClick={() => setModalCarrito(null)}>
+                                <div className="bg-white rounded-t-3xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-lg font-bold text-gray-800">➕ {modalCarrito.prod.nombre}</h3>
+                                        <button onClick={() => setModalCarrito(null)} className="text-2xl text-gray-400">×</button>
+                                    </div>
+                                    {/* Opciones (Con sal / Sin sal etc) */}
+                                    {(modalCarrito.prod.opciones || []).length > 0 && (
+                                        <div className="mb-4">
+                                            <p className="text-xs font-bold text-gray-600 mb-2">Elige una opción:</p>
+                                            <div className="flex gap-2 flex-wrap">
+                                                {modalCarrito.prod.opciones.map((op, i) => (
+                                                    <button key={i}
+                                                        onClick={() => setCarritoForm(f => ({ ...f, opcion: op.nombre }))}
+                                                        className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition ${carritoForm.opcion === op.nombre ? 'bg-amber-500 text-white border-amber-500' : 'border-amber-300 text-amber-700 bg-white'}`}>
+                                                        {carritoForm.opcion === op.nombre ? '✓ ' : ''}{op.nombre}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Tipo: Unidades o Paquetes */}
+                                    <div className="mb-4">
+                                        <p className="text-xs font-bold text-gray-600 mb-2">¿Cómo lo quieres?</p>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button onClick={() => setCarritoForm(f => ({ ...f, tipo: 'Unidades' }))}
+                                                className={`p-3 rounded-xl text-sm font-bold border-2 transition ${carritoForm.tipo === 'Unidades' ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-200 text-gray-700 bg-white'}`}>
+                                                🌽 Unidades<br/><span className="text-xs font-normal">{formatCOP(modalCarrito.precioUnd)} c/u</span>
+                                            </button>
+                                            <button onClick={() => setCarritoForm(f => ({ ...f, tipo: 'Paquetes' }))}
+                                                className={`p-3 rounded-xl text-sm font-bold border-2 transition ${carritoForm.tipo === 'Paquetes' ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-200 text-gray-700 bg-white'}`}>
+                                                📦 Paquetes<br/><span className="text-xs font-normal">{formatCOP(modalCarrito.precioPaqFinal)} x{modalCarrito.prod.unidades_paquete}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* Cantidad */}
+                                    <div className="mb-4">
+                                        <p className="text-xs font-bold text-gray-600 mb-2">¿Cuántos {carritoForm.tipo === 'Unidades' ? 'unidades' : 'paquetes'}?</p>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={() => setCarritoForm(f => ({ ...f, cantidad: String(Math.max(1, (parseInt(f.cantidad)||0) - 1) )}))}
+                                                className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 text-xl font-bold flex items-center justify-center">−</button>
+                                            <input type="number" min="1" value={carritoForm.cantidad}
+                                                onChange={e => setCarritoForm(f => ({ ...f, cantidad: e.target.value }))}
+                                                className="flex-1 p-3 border-2 border-gray-200 rounded-xl text-center text-lg font-bold text-gray-800 bg-white" />
+                                            <button onClick={() => setCarritoForm(f => ({ ...f, cantidad: String((parseInt(f.cantidad)||0) + 1) }))}
+                                                className="w-10 h-10 rounded-full bg-orange-500 text-white text-xl font-bold flex items-center justify-center">+</button>
+                                        </div>
+                                    </div>
+                                    {/* Subtotal preview */}
+                                    {carritoForm.cantidad > 0 && (
+                                        <div className="bg-orange-50 p-3 rounded-xl mb-4 flex justify-between items-center">
+                                            <span className="text-sm text-gray-600">Subtotal</span>
+                                            <span className="font-bold text-orange-600 text-lg">{formatCOP((parseInt(carritoForm.cantidad)||0) * (carritoForm.tipo === 'Unidades' ? modalCarrito.precioUnd : modalCarrito.precioPaqFinal))}</span>
+                                        </div>
+                                    )}
+                                    <button onClick={() => {
+                                        const cant = parseInt(carritoForm.cantidad);
+                                        if (!cant || cant <= 0) { pushToast('Ingresa una cantidad válida', 'error'); return; }
+                                        if ((modalCarrito.prod.opciones||[]).length > 0 && !carritoForm.opcion) { pushToast('Elige una opción primero', 'error'); return; }
+                                        const precio = carritoForm.tipo === 'Unidades' ? modalCarrito.precioUnd : modalCarrito.precioPaqFinal;
+                                        setCarrito(c => [...c, {
+                                            prod_id: modalCarrito.prod.id,
+                                            nombre: modalCarrito.prod.nombre,
+                                            opcion: carritoForm.opcion || '',
+                                            tipo: carritoForm.tipo,
+                                            cantidad: cant,
+                                            precio_unitario: precio,
+                                            subtotal: cant * precio
+                                        }]);
+                                        pushToast('✅ Agregado al carrito');
+                                        setModalCarrito(null);
+                                    }}
+                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4 rounded-xl font-bold text-base shadow">
+                                        ✅ Agregar al carrito
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Barra de navegación inferior */}
                         <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 shadow-2xl">
-                            <div className="grid grid-cols-3">
+                            <div className="grid grid-cols-5">
                                 {[
                                     { id: 'inicio', icon: '🏠', label: 'Inicio' },
-                                    { id: 'cuenta', icon: '💰', label: 'Mi Cuenta' },
-                                    { id: 'catalogo', icon: '🛒', label: 'Catálogo' },
+                                    { id: 'cuenta', icon: '💰', label: 'Cuenta' },
+                                    { id: 'catalogo', icon: '🛍️', label: 'Catálogo' },
+                                    { id: 'carrito', icon: '🛒', label: `Carrito${carrito.length > 0 ? ' ('+carrito.length+')' : ''}` },
+                                    { id: 'pedidos', icon: '📦', label: 'Pedidos' },
                                 ].map(tab => (
                                     <button key={tab.id} onClick={() => setTabPortal(tab.id)}
-                                        className={`py-3 flex flex-col items-center gap-0.5 transition ${tabPortal === tab.id ? 'text-orange-600 border-t-2 border-orange-500' : 'text-gray-400 hover:text-gray-600'}`}>
-                                        <span className="text-xl">{tab.icon}</span>
-                                        <span className="text-xs font-semibold">{tab.label}</span>
+                                        className={`py-2 flex flex-col items-center gap-0.5 transition relative ${tabPortal === tab.id ? 'text-orange-600 border-t-2 border-orange-500' : 'text-gray-400 hover:text-gray-600'}`}>
+                                        <span className="text-lg">{tab.icon}</span>
+                                        <span className="text-xs font-semibold leading-tight text-center" style={{fontSize:'9px'}}>{tab.label}</span>
+                                        {tab.id === 'carrito' && carrito.length > 0 && (
+                                            <span className="absolute -top-1 right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold" style={{fontSize:'9px'}}>{carrito.length}</span>
+                                        )}
+                                        {tab.id === 'pedidos' && pedidosPortal.filter(p => p.estado === 'pendiente').length > 0 && (
+                                            <span className="absolute -top-1 right-1 bg-yellow-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold" style={{fontSize:'9px'}}>{pedidosPortal.filter(p => p.estado === 'pendiente').length}</span>
+                                        )}
                                     </button>
                                 ))}
                             </div>
@@ -2556,6 +2801,27 @@ const loadData = async (silencioso = false) => {
                                                     }}
                                                     className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'negocio' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
                                                     <span>⚙️</span> Mi Negocio
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('pedidos_portal');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'pedidos_portal' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>📲</span> Pedidos Portal
+                                                    {pedidosAdmin.filter(p => p.estado === 'pendiente').length > 0 && (
+                                                        <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold">{pedidosAdmin.filter(p => p.estado === 'pendiente').length}</span>
+                                                    )}
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveTab('otros_productos');
+                                                        setShowMenu(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 font-medium transition flex items-center gap-2 ${activeTab === 'otros_productos' ? 'bg-orange-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                                                    <span>🛍️</span> Otros Productos
                                                 </button>
 
                                                 <button
@@ -3423,6 +3689,34 @@ const loadData = async (silencioso = false) => {
                                     </button>
                                     {mostrarFormVenta && <div className="px-4 pb-4 md:px-8 md:pb-8">
                                     <form onSubmit={async (e) => { await addVenta(e); setMostrarFormVenta(false); }} className="space-y-4">
+                                        {/* Selector de producto */}
+                                        {productos.length > 0 && (
+                                            <div className={`p-3 rounded-xl border-2 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-amber-50 border-amber-200'}`}>
+                                                <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>🫓 Producto</p>
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {productos.filter(p => p.activo).map(prod => (
+                                                        <button type="button" key={prod.id}
+                                                            onClick={() => setVentaProductoId(String(prod.id))}
+                                                            className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition ${ventaProductoId === String(prod.id) ? 'bg-amber-500 text-white border-amber-500' : darkMode ? 'bg-gray-600 text-gray-200 border-gray-500 hover:bg-gray-500' : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-100'}`}>
+                                                            🛍️ {prod.nombre}
+                                                        </button>
+                                                    ))}
+                                                    <button type="button"
+                                                        onClick={() => setVentaProductoId('')}
+                                                        className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition ${ventaProductoId === '' ? 'bg-gray-500 text-white border-gray-500' : darkMode ? 'bg-gray-600 text-gray-200 border-gray-500 hover:bg-gray-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-100'}`}>
+                                                        ✏️ Precio manual
+                                                    </button>
+                                                </div>
+                                                {ventaProductoId && (() => {
+                                                    const prodSel = productos.find(p => String(p.id) === ventaProductoId);
+                                                    return prodSel ? (
+                                                        <p className={`text-xs mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                            Unidad: {formatCOP(prodSel.precio_unidad)} · Paquete x{prodSel.unidades_paquete}: {formatCOP(prodSel.precio_paquete)}
+                                                        </p>
+                                                    ) : null;
+                                                })()}
+                                            </div>
+                                        )}
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <select value={ventaForm.cliente_id} onChange={(e) => setVentaForm({ ...ventaForm, cliente_id: e.target.value })} required className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
                                                 <option value="" className={darkMode ? 'bg-gray-700 text-white' : ''}>Seleccionar Cliente *</option>
@@ -3431,8 +3725,16 @@ const loadData = async (silencioso = false) => {
                                                 ).map(c => (<option key={c.id} value={c.id} className={darkMode ? 'bg-gray-700 text-white' : ''}>{c.nombre} ({c.tipo_cliente})</option>))}
                                             </select>
                                             <select value={ventaForm.tipo_cantidad} onChange={(e) => setVentaForm({ ...ventaForm, tipo_cantidad: e.target.value, cantidad: '', total: '' })} className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
-                                                <option value="Unidades">🌽 Unidades ({formatCOP(precioUnidad)} c/u)</option>
-                                                <option value="Paquetes">📦 Paquetes ({formatCOP(precioPaquete)} c/u)</option>
+                                                {(() => {
+                                                    const prodSel = ventaProductoId ? productos.find(p => String(p.id) === ventaProductoId) : null;
+                                                    const puFinal = prodSel ? prodSel.precio_unidad : precioUnidad;
+                                                    const ppFinal = prodSel ? prodSel.precio_paquete : precioPaquete;
+                                                    const upFinal = prodSel ? prodSel.unidades_paquete : 10;
+                                                    return (<>
+                                                        <option value="Unidades">🌽 Unidades ({formatCOP(puFinal)} c/u)</option>
+                                                        <option value="Paquetes">📦 Paquetes ({formatCOP(ppFinal)} x{upFinal})</option>
+                                                    </>);
+                                                })()}
                                             </select>
                                             <input type="number" min="1" value={ventaForm.cantidad} onChange={(e) => setVentaForm({ ...ventaForm, cantidad: e.target.value })} placeholder="Cantidad *" className={`p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} required />
                                         </div>
@@ -3564,6 +3866,13 @@ const loadData = async (silencioso = false) => {
                                                     if (v.tipo_cantidad === 'Unidades') return s + ((parseInt(v.cantidad) || 0) % 10);
                                                     return s;
                                                 }, 0);
+                                                // Desglose por producto
+                                                const productosDia = {};
+                                                grupo.ventas.forEach(v => {
+                                                    let nomP = "Arepa de Maíz";
+                                                    if (v.notas && v.notas.startsWith("🛍️")) nomP = v.notas.split(" — ")[0].replace("🛍️ ","");
+                                                    productosDia[nomP] = (productosDia[nomP] || 0) + (parseInt(v.cantidad) || 0);
+                                                });
                                                 return (
                                                     <div key={grupo.key} className={`rounded-xl border-2 overflow-hidden ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
                                                         {/* Encabezado fecha - clic para abrir/cerrar */}
@@ -3575,6 +3884,11 @@ const loadData = async (silencioso = false) => {
                                                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'}`}>
                                                                     📦 {grupo.ventas.reduce((s, v) => { if (v.tipo_cantidad === 'Paquetes') return s + (parseInt(v.cantidad) || 0); if (v.tipo_cantidad === 'Unidades') return s + Math.floor((parseInt(v.cantidad) || 0) / 10); return s; }, 0)} paq{grupo.ventas.reduce((s, v) => v.tipo_cantidad === 'Unidades' ? s + ((parseInt(v.cantidad) || 0) % 10) : s, 0) > 0 ? ` + ${grupo.ventas.reduce((s, v) => v.tipo_cantidad === 'Unidades' ? s + ((parseInt(v.cantidad) || 0) % 10) : s, 0)} und` : ''}
                                                                 </span>
+                                                               {Object.keys(productosDia).length > 1 && Object.entries(productosDia).map(([nom, cant]) => (
+                                                                    <span key={nom} className={`text-xs px-2 py-1 rounded-full font-medium ${darkMode ? "bg-amber-900/50 text-amber-300" : "bg-amber-100 text-amber-700"}`}>
+                                                                        🛍️ {nom}: {cant}
+                                                                    </span>
+                                                                ))}
                                                                {pendientesGrupo > 0 && (
                                                                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${darkMode ? 'bg-yellow-900/50 text-yellow-300' : 'bg-yellow-100 text-yellow-700'}`}>
                                                                         ⏳ {pendientesGrupo} pend · {formatCOP(grupo.ventas.filter(v => v.estado_pago === 'Pendiente').reduce((s, v) => s + (parseFloat(v.total) || 0) - (parseFloat(v.abono) || 0), 0))}
@@ -3609,7 +3923,15 @@ const loadData = async (silencioso = false) => {
                                                                                 <td className="p-2 md:p-3">
                                                                                     <div className="flex items-center gap-2">
                                                                                         <input type="checkbox" checked={ventasSeleccionadas.has(v.id)} onChange={() => toggleSeleccion(v.id)} className="w-4 h-4 accent-orange-500 cursor-pointer" />
-                                                                                        <span className={`font-medium text-xs md:text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{v.clientes?.nombre || 'N/A'}</span>
+                                                                                        <div>
+                                                                                            <span className={`font-medium text-xs md:text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{v.clientes?.nombre || 'N/A'}</span>
+                                                                                            {v.notas && v.notas.startsWith('🛍️') && (
+                                                                                                <p className="text-xs text-amber-500 font-semibold leading-tight">{v.notas.split(' — ')[0]}</p>
+                                                                                            )}
+                                                                                            {v.notas && v.notas.startsWith('[Pedido Portal') && (
+                                                                                                <p className="text-xs text-blue-400 font-semibold leading-tight">📲 Portal</p>
+                                                                                            )}
+                                                                                        </div>
                                                                                     </div>
                                                                                 </td>
                                                                                 <td className="p-2 md:p-3">
@@ -4961,7 +5283,37 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                         </div>
                                     </div>
 
-                                    {/* Tabla de puntos por cliente */}
+                                    {/* ➕ Agregar puntos manualmente */}
+                                    <div className={`p-3 rounded-xl border-2 mb-4 ${darkMode ? 'border-amber-700 bg-amber-900/20' : 'border-amber-300 bg-amber-50'}`}>
+                                        <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>⭐ Agregar puntos manualmente</p>
+                                        <div className="flex gap-2">
+                                            <select id="pts-agregar-cliente"
+                                                className={`flex-1 p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white text-gray-900 border-gray-200'}`}>
+                                                <option value="">Selecciona cliente</option>
+                                                {clientes.filter(c => c.activo !== false)
+                                                    .sort((a,b) => a.nombre.localeCompare(b.nombre,'es'))
+                                                    .map(c => (
+                                                    <option key={c.id} value={c.id}>{c.nombre} — {c.puntos || 0} pts</option>
+                                                ))}
+                                            </select>
+                                            <input type="number" id="pts-agregar-monto" placeholder="Pts"
+                                                className={`w-20 p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-600 text-white border-gray-500' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                            <button onClick={async () => {
+                                                const clienteId = parseInt(document.getElementById('pts-agregar-cliente').value);
+                                                const ptsAgregar = parseInt(document.getElementById('pts-agregar-monto').value);
+                                                if (!clienteId || !ptsAgregar || ptsAgregar <= 0) { pushToast('Selecciona cliente y cantidad de puntos', 'error'); return; }
+                                                const clienteActual = clientes.find(c => c.id === clienteId);
+                                                const ptsActuales = clienteActual?.puntos || 0;
+                                                showConfirm('⭐ Agregar puntos', `¿Agregar ${ptsAgregar} pts a ${clienteActual.nombre}?\nTendrá ${ptsActuales + ptsAgregar} pts en total.`, async () => {
+                                                    await supabaseClient.from('clientes').update({ puntos: ptsActuales + ptsAgregar }).eq('id', clienteId);
+                                                    pushToast(`✅ ${ptsAgregar} puntos agregados a ${clienteActual.nombre}`);
+                                                    await loadData(true);
+                                                });
+                                            }} className="px-3 py-2 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition">
+                                                ⭐
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div className="mb-4">
                                         <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>⭐ Puntos acumulados por cliente</p>
                                         <div className={`rounded-xl border-2 overflow-hidden ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
@@ -5096,6 +5448,214 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                         )}
                                     </div>
                                     </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'otros_productos' && (
+                            <div className="space-y-4 fade-in">
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-t-8 border-amber-500`}>
+                                    <h2 className="text-lg md:text-2xl font-bold mb-2 flex items-center gap-2">
+                                        <span>🛍️</span> Ventas — Otros Productos
+                                    </h2>
+                                    <p className={`text-xs mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                        Solo ventas registradas con un producto del catálogo (excluye Arepa de Maíz)
+                                    </p>
+                                    {(() => {
+                                        // Filtrar ventas que tengan nota de producto del catálogo pero NO sean Arepa de Maíz
+                                        const nombreArepa = productos.find(p => p.orden === 1)?.nombre || 'Arepa de Maíz';
+                                        const ventasOtros = ventas.filter(v =>
+                                            v.notas &&
+                                            v.notas.startsWith('🛍️') &&
+                                            !v.notas.startsWith(`🛍️ ${nombreArepa}`)
+                                        );
+
+                                        // Agrupar por producto
+                                        const porProducto = {};
+                                        ventasOtros.forEach(v => {
+                                            const nomProd = v.notas.split(' — ')[0].replace('🛍️ ','').trim();
+                                            if (!porProducto[nomProd]) porProducto[nomProd] = { ventas: [], total: 0, pagado: 0, pendiente: 0, cantidad: 0 };
+                                            const tot = parseFloat(v.total) || 0;
+                                            const abo = parseFloat(v.abono) || 0;
+                                            porProducto[nomProd].ventas.push(v);
+                                            porProducto[nomProd].total += tot;
+                                            porProducto[nomProd].pagado += v.estado_pago === 'Pagado' ? tot : abo;
+                                            porProducto[nomProd].pendiente += v.estado_pago === 'Pendiente' ? tot - abo : 0;
+                                            porProducto[nomProd].cantidad += parseInt(v.cantidad) || 0;
+                                        });
+
+                                        if (ventasOtros.length === 0) return (
+                                            <div className="text-center py-12">
+                                                <span className="text-5xl mb-3 block">🛍️</span>
+                                                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Sin ventas de otros productos aún</p>
+                                                <p className={`text-xs mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Selecciona un producto del catálogo al registrar una venta</p>
+                                            </div>
+                                        );
+
+                                        return (
+                                            <div className="space-y-6">
+                                                {/* Resumen por producto */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {Object.entries(porProducto).map(([nom, data]) => (
+                                                        <div key={nom} className={`p-4 rounded-2xl border-2 ${darkMode ? 'border-amber-700 bg-amber-900/20' : 'border-amber-200 bg-amber-50'}`}>
+                                                            <p className="font-bold text-base text-amber-600 mb-3">🛍️ {nom}</p>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <div className={`${darkMode ? 'bg-gray-700' : 'bg-white'} p-2 rounded-xl text-center`}>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Facturado</p>
+                                                                    <p className="font-bold text-orange-500">{formatCOP(data.total)}</p>
+                                                                </div>
+                                                                <div className={`${darkMode ? 'bg-gray-700' : 'bg-white'} p-2 rounded-xl text-center`}>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Cobrado</p>
+                                                                    <p className="font-bold text-green-500">{formatCOP(data.pagado)}</p>
+                                                                </div>
+                                                                <div className={`${darkMode ? 'bg-gray-700' : 'bg-white'} p-2 rounded-xl text-center`}>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pendiente</p>
+                                                                    <p className="font-bold text-red-500">{formatCOP(data.pendiente)}</p>
+                                                                </div>
+                                                                <div className={`${darkMode ? 'bg-gray-700' : 'bg-white'} p-2 rounded-xl text-center`}>
+                                                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Unidades</p>
+                                                                    <p className="font-bold text-blue-500">{data.cantidad}</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Lista de ventas */}
+                                                <div>
+                                                    <h3 className={`font-bold text-sm mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>📋 Detalle de ventas ({ventasOtros.length})</h3>
+                                                    <div className="space-y-2 max-h-96 overflow-y-auto scrollbar-hide">
+                                                        {ventasOtros.sort((a,b) => new Date(b.fecha||0) - new Date(a.fecha||0)).map(v => {
+                                                            const nomProd = v.notas.split(' — ')[0].replace('🛍️ ','').trim();
+                                                            const saldo = (parseFloat(v.total)||0) - (parseFloat(v.abono)||0);
+                                                            return (
+                                                                <div key={v.id} className={`p-3 rounded-xl border ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-gray-50'} flex justify-between items-center`}>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <p className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>{v.clientes?.nombre || '—'}</p>
+                                                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${darkMode ? 'bg-amber-900 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>🛍️ {nomProd}</span>
+                                                                        </div>
+                                                                        <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                                            {v.cantidad} {v.tipo_cantidad} · {v.fecha ? new Date(v.fecha.slice(0,10)+'T00:00:00').toLocaleDateString('es-CO') : '—'}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="text-right ml-3 flex-shrink-0">
+                                                                        <p className="font-bold text-green-500 text-sm">{formatCOP(v.total)}</p>
+                                                                        {saldo > 0 && <p className="text-xs text-red-400">Debe: {formatCOP(saldo)}</p>}
+                                                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${v.estado_pago === 'Pagado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                                            {v.estado_pago === 'Pagado' ? '✅' : '⏳'} {v.estado_pago}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'pedidos_portal' && (
+                            <div className="space-y-4 fade-in">
+                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-4 md:p-6 rounded-2xl shadow-xl border-t-8 border-orange-500`}>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h2 className="text-lg md:text-2xl font-bold flex items-center gap-2">
+                                            <span>📲</span> Pedidos del Portal
+                                            {pedidosAdmin.filter(p => p.estado === 'pendiente').length > 0 && (
+                                                <span className="bg-red-500 text-white text-sm rounded-full px-2 py-0.5 font-bold">{pedidosAdmin.filter(p => p.estado === 'pendiente').length} nuevos</span>
+                                            )}
+                                        </h2>
+                                        <button onClick={() => loadData(true)} className={`px-3 py-2 rounded-xl text-sm font-bold transition ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>🔄 Actualizar</button>
+                                    </div>
+                                    {pedidosAdmin.length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <span className="text-5xl mb-3 block">📲</span>
+                                            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Sin pedidos del portal aún</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {pedidosAdmin.map(ped => {
+                                                const estadoClr = ped.estado === 'aceptado' ? darkMode ? 'bg-green-900 text-green-300 border-green-700' : 'bg-green-50 border-green-300' : ped.estado === 'cancelado' ? darkMode ? 'bg-red-900 text-red-300 border-red-700' : 'bg-red-50 border-red-300' : darkMode ? 'bg-yellow-900/30 border-yellow-700' : 'bg-yellow-50 border-yellow-300';
+                                                const nombreCliente = ped.clientes_portal?.nombre || ped.clientes?.nombre || 'Cliente';
+                                                const telCliente = ped.clientes_portal?.telefono || '';
+                                                return (
+                                                    <div key={ped.id} className={`border-2 rounded-2xl overflow-hidden ${estadoClr}`}>
+                                                        {/* Header */}
+                                                        <div className={`p-4 flex justify-between items-start ${darkMode ? 'bg-gray-700' : 'bg-white'}`}>
+                                                            <div>
+                                                                <p className={`font-bold text-base ${darkMode ? 'text-white' : 'text-gray-800'}`}>{nombreCliente}</p>
+                                                                {telCliente && <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📱 {telCliente}</p>}
+                                                                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(ped.created_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="font-bold text-green-500 text-lg">{formatCOP(ped.total)}</p>
+                                                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${ped.estado === 'aceptado' ? 'bg-green-100 text-green-700' : ped.estado === 'cancelado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                                    {ped.estado === 'aceptado' ? '✅ Aceptado' : ped.estado === 'cancelado' ? '❌ Cancelado' : '⏳ Pendiente'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        {/* Items */}
+                                                        <div className={`px-4 py-3 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
+                                                            {(ped.items || []).map((item, i) => (
+                                                                <div key={i} className="flex justify-between text-sm py-1">
+                                                                    <span className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                                        • {item.nombre}{item.opcion ? ` (${item.opcion})` : ''} — {item.cantidad} {item.tipo}
+                                                                    </span>
+                                                                    <span className="font-semibold text-green-500">{formatCOP(item.subtotal)}</span>
+                                                                </div>
+                                                            ))}
+                                                            {ped.notas && <p className={`text-xs mt-2 italic ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>📝 {ped.notas}</p>}
+                                                            {ped.motivo_cancelacion && <p className="text-xs mt-2 text-red-500 font-semibold">❌ Cancelado: {ped.motivo_cancelacion}</p>}
+                                                        </div>
+                                                        {/* Acciones solo si está pendiente */}
+                                                        {ped.estado === 'pendiente' && (
+                                                            <div className={`p-4 flex gap-2 flex-wrap ${darkMode ? 'bg-gray-700' : 'bg-white'}`}>
+                                                                <button onClick={() => {
+                                                                    // Abrir modal de edición antes de crear venta
+                                                                    const clienteMatch = clientes.find(c => c.id === ped.cliente_id);
+                                                                    setModalEditarPedido({
+                                                                        ped,
+                                                                        cliente_id: ped.cliente_id || '',
+                                                                        estado_pago: 'Pendiente',
+                                                                        fecha: new Date().toISOString().slice(0,10),
+                                                                        abono: '',
+                                                                        notas: ped.notas || ''
+                                                                    });
+                                                                }}
+                                                                    className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-xl font-bold text-sm hover:from-green-600 hover:to-green-700 transition">
+                                                                    ✅ Aceptar y crear venta
+                                                                </button>
+                                                                <button onClick={async () => {
+                                                                    if (!confirm(`¿Rechazar pedido de ${nombreCliente}?`)) return;
+                                                                    await supabaseClient.from('pedidos_portal').update({ estado: 'cancelado', motivo_cancelacion: 'Rechazado por el negocio' }).eq('id', ped.id);
+                                                                    if (telCliente) {
+                                                                        const msg = `Hola ${nombreCliente} 😔 Lamentablemente no podemos procesar tu pedido en este momento. Por favor contáctanos para más información. ¡Gracias!`;
+                                                                        window.open(`https://wa.me/57${telCliente}?text=${encodeURIComponent(msg)}`, '_blank');
+                                                                    }
+                                                                    await loadData(true);
+                                                                    pushToast('Pedido rechazado');
+                                                                }}
+                                                                    className="px-4 bg-red-100 text-red-700 p-3 rounded-xl font-bold text-sm hover:bg-red-200 transition">
+                                                                    ❌ Rechazar
+                                                                </button>
+                                                                <button onClick={() => {
+                                                                    if (!telCliente) { pushToast('Sin teléfono del cliente', 'error'); return; }
+                                                                    const msg = `Hola ${nombreCliente}! 🫓 Tu pedido fue *recibido* y está siendo procesado.\n\nDetalles:\n${(ped.items||[]).map(i => '• '+i.nombre+(i.opcion?' ('+i.opcion+')':'')+' — '+i.cantidad+' '+i.tipo+' → '+formatCOP(i.subtotal)).join('\n')}\n\n💰 Total: ${formatCOP(ped.total)}\n\n¡Gracias por tu confianza! 😊`;
+                                                                    window.open(`https://wa.me/57${telCliente}?text=${encodeURIComponent(msg)}`, '_blank');
+                                                                }}
+                                                                    className="px-4 bg-green-100 text-green-700 p-3 rounded-xl font-bold text-sm hover:bg-green-200 transition">
+                                                                    📱 WA
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -6085,6 +6645,132 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                             </div>
                         </div>
                     )}
+                    {/* Modal editar y aceptar pedido portal */}
+                    {modalEditarPedido && (
+                        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setModalEditarPedido(null)}>
+                            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
+                                <div className="p-5">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-lg font-bold flex items-center gap-2">✅ Aceptar Pedido</h3>
+                                        <button onClick={() => setModalEditarPedido(null)} className="text-2xl hover:text-red-500">×</button>
+                                    </div>
+                                    {/* Resumen del pedido */}
+                                    <div className={`p-3 rounded-xl mb-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                                        <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>📦 Productos del pedido:</p>
+                                        {(modalEditarPedido.ped.items || []).map((item, i) => (
+                                            <div key={i} className="flex justify-between text-sm py-1">
+                                                <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>• {item.nombre}{item.opcion ? ` (${item.opcion})` : ''} — {item.cantidad} {item.tipo}</span>
+                                                <span className="font-semibold text-green-500">{formatCOP(item.subtotal)}</span>
+                                            </div>
+                                        ))}
+                                        <div className={`pt-2 mt-2 border-t ${darkMode ? 'border-gray-600' : 'border-gray-200'} flex justify-between`}>
+                                            <span className="font-bold">Total</span>
+                                            <span className="font-bold text-green-500">{formatCOP(modalEditarPedido.ped.total)}</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {/* Cliente */}
+                                        <div>
+                                            <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>👤 Cliente</label>
+                                            <select value={modalEditarPedido.cliente_id} onChange={e => setModalEditarPedido(m => ({ ...m, cliente_id: e.target.value }))}
+                                                className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
+                                                <option value="">Sin cliente vinculado</option>
+                                                {clientes.filter(c => c.activo !== false).sort((a,b) => a.nombre.localeCompare(b.nombre,'es')).map(c => (
+                                                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        {/* Estado de pago */}
+                                        <div>
+                                            <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>💰 Estado de pago</label>
+                                            <select value={modalEditarPedido.estado_pago} onChange={e => setModalEditarPedido(m => ({ ...m, estado_pago: e.target.value }))}
+                                                className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`}>
+                                                <option value="Pendiente">⏳ Pendiente</option>
+                                                <option value="Pagado">✅ Pagado</option>
+                                            </select>
+                                        </div>
+                                        {/* Abono */}
+                                        <div>
+                                            <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>💵 Abono (opcional)</label>
+                                            <input type="number" value={modalEditarPedido.abono} onChange={e => setModalEditarPedido(m => ({ ...m, abono: e.target.value }))}
+                                                placeholder="0"
+                                                className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        </div>
+                                        {/* Fecha */}
+                                        <div>
+                                            <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>📅 Fecha de entrega</label>
+                                            <input type="date" value={modalEditarPedido.fecha} onChange={e => setModalEditarPedido(m => ({ ...m, fecha: e.target.value }))}
+                                                className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        </div>
+                                        {/* Notas */}
+                                        <div>
+                                            <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>📝 Notas</label>
+                                            <input type="text" value={modalEditarPedido.notas} onChange={e => setModalEditarPedido(m => ({ ...m, notas: e.target.value }))}
+                                                placeholder="Notas adicionales..."
+                                                className={`w-full p-3 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
+                                        </div>
+                                    </div>
+                                    <button onClick={async () => {
+                                        if (!modalEditarPedido.cliente_id) { pushToast('Selecciona un cliente', 'error'); return; }
+                                        setIsLoading(true);
+                                        try {
+                                            const ped = modalEditarPedido.ped;
+                                            const total = ped.total;
+                                            const abono = parseFloat(modalEditarPedido.abono) || 0;
+                                            const fechaISO = modalEditarPedido.fecha ? new Date(modalEditarPedido.fecha + 'T12:00:00').toISOString() : new Date().toISOString();
+                                            // Descripción de ítems para la venta
+                                            const descItems = (ped.items||[]).map(i => `${i.cantidad} ${i.tipo} ${i.nombre}${i.opcion?' ('+i.opcion+')':''}`).join(', ');
+                                            // Crear venta con todos los detalles
+                                            const { data: ventaCreada, error: errV } = await supabaseClient.from('ventas').insert({
+                                                cliente_id: parseInt(modalEditarPedido.cliente_id),
+                                                cantidad: (ped.items||[]).reduce((s,i) => s + i.cantidad, 0),
+                                                tipo_cantidad: 'Unidades',
+                                                precio_unitario: 0,
+                                                total,
+                                                abono,
+                                                estado_pago: modalEditarPedido.estado_pago,
+                                                fecha: fechaISO,
+                                                notas: `[Pedido Portal #${ped.id}] ${descItems}${modalEditarPedido.notas ? ' — ' + modalEditarPedido.notas : ''}`,
+                                                usuario_id: user?.id
+                                            }).select();
+                                            if (errV) { pushToast('Error al crear venta: ' + errV.message, 'error'); return; }
+                                            const ventaId = ventaCreada?.[0]?.id;
+                                            // Registrar ingreso si pagado
+                                            if (modalEditarPedido.estado_pago === 'Pagado' && ventaId) {
+                                                await supabaseClient.from('ingresos').insert({ concepto: `Venta - ${clientes.find(c=>c.id===parseInt(modalEditarPedido.cliente_id))?.nombre} [ID:${ventaId}]`, monto: total, categoria: 'Venta', fecha: fechaISO, notas: `venta_id:${ventaId}` });
+                                                lanzarConfeti();
+                                            } else if (abono > 0 && ventaId) {
+                                                await supabaseClient.from('ingresos').insert({ concepto: `Abono - ${clientes.find(c=>c.id===parseInt(modalEditarPedido.cliente_id))?.nombre} [ID:${ventaId}]`, monto: abono, categoria: 'Abono', fecha: fechaISO, notas: `venta_id:${ventaId}` });
+                                            }
+                                            // Acumular puntos si pagado y supera mínimo
+                                            if (modalEditarPedido.estado_pago === 'Pagado' && total >= (configPuntos.monto_minimo || 12000)) {
+                                                const clienteAct = clientes.find(c => c.id === parseInt(modalEditarPedido.cliente_id));
+                                                if (clienteAct) await supabaseClient.from('clientes').update({ puntos: (clienteAct.puntos || 0) + (configPuntos.puntos_por_compra || 50) }).eq('id', clienteAct.id);
+                                            }
+                                            // Marcar pedido como aceptado
+                                            await supabaseClient.from('pedidos_portal').update({ estado: 'aceptado' }).eq('id', ped.id);
+                                            // Notificar al cliente por WhatsApp
+                                            const telCliente = ped.clientes_portal?.telefono || '';
+                                            if (telCliente) {
+                                                const nombreCliente = ped.clientes_portal?.nombre || 'cliente';
+                                                const msg = `¡Hola ${nombreCliente}! 🎉 Tu pedido fue *ACEPTADO*.\n\nDetalles:\n${(ped.items||[]).map(i => '• '+i.nombre+(i.opcion?' ('+i.opcion+')':'')+' — '+i.cantidad+' '+i.tipo+' → '+formatCOP(i.subtotal)).join('\n')}\n\n💰 Total: ${formatCOP(total)}\n📅 Fecha de entrega: ${modalEditarPedido.fecha}\n\n¡Gracias por tu pedido! 🫓😊`;
+                                                window.open(`https://wa.me/57${telCliente}?text=${encodeURIComponent(msg)}`, '_blank');
+                                            }
+                                            pushToast('✅ Venta creada y pedido aceptado');
+                                            setModalEditarPedido(null);
+                                            await loadData(true);
+                                        } catch(err) {
+                                            pushToast('Error: ' + err.message, 'error');
+                                        } finally { setIsLoading(false); }
+                                    }}
+                                        className="w-full mt-4 bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold text-lg hover:from-green-600 hover:to-green-700 transition shadow-lg">
+                                        ✅ Crear Venta y Aceptar Pedido
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {modalDuplicar && (
                         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 md:p-4" onClick={() => setModalDuplicar(null)}>
                             <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto scale-in`} onClick={e => e.stopPropagation()}>
@@ -6277,7 +6963,7 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                     {/* Modal aprobación cliente portal */}
                     {modalAprobar && (
                         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setModalAprobar(null)}>
-                            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-2xl shadow-2xl w-full max-w-md`} onClick={e => e.stopPropagation()}>
+                            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-lg font-bold flex items-center gap-2">✅ Aprobar Cliente</h3>
                                     <button onClick={() => setModalAprobar(null)} className="text-2xl hover:text-red-500">×</button>
@@ -6302,19 +6988,19 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
 
                                     {/* Lista de coincidencias */}
                                     {buscarClienteVinc.length > 0 && (
-                                        <div className={`mt-2 border-2 rounded-xl overflow-hidden max-h-40 overflow-y-auto ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                        <div className={`mt-2 border-2 rounded-xl overflow-hidden max-h-48 overflow-y-auto ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
                                             {clientes.filter(c => c.activo !== false &&
                                                 c.nombre.toLowerCase().includes(buscarClienteVinc.toLowerCase())
-                                            ).slice(0, 6).map(c => (
+                                            ).slice(0, 8).map(c => (
                                                 <button key={c.id}
                                                     onClick={() => { setClienteVinculado(c); setBuscarClienteVinc(c.nombre); }}
-                                                    className={`w-full text-left px-3 py-2 text-sm transition ${clienteVinculado?.id === c.id ? 'bg-green-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white' : 'hover:bg-gray-50 text-gray-800'}`}>
+                                                    className={`w-full text-left px-3 py-3 text-sm transition border-b last:border-b-0 ${clienteVinculado?.id === c.id ? 'bg-green-500 text-white' : darkMode ? 'hover:bg-gray-700 text-white border-gray-600' : 'hover:bg-gray-50 text-gray-800 border-gray-100'}`}>
                                                     <span className="font-medium">{c.nombre}</span>
                                                     <span className={`text-xs ml-2 ${clienteVinculado?.id === c.id ? 'text-green-100' : 'text-gray-400'}`}>{c.tipo_cliente}</span>
                                                 </button>
                                             ))}
                                             {clientes.filter(c => c.activo !== false && c.nombre.toLowerCase().includes(buscarClienteVinc.toLowerCase())).length === 0 && (
-                                                <p className="px-3 py-2 text-sm text-gray-400">Sin resultados</p>
+                                                <p className="px-3 py-3 text-sm text-gray-400">Sin resultados — se creará como cliente nuevo</p>
                                             )}
                                         </div>
                                     )}
@@ -6324,49 +7010,60 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                     <div className={`p-3 rounded-xl mb-4 border-2 border-green-400 ${darkMode ? 'bg-green-900/20' : 'bg-green-50'}`}>
                                         <p className="text-sm font-bold text-green-600">✅ Vincular con: {clienteVinculado.nombre}</p>
                                         <p className="text-xs text-gray-500">Se usará este cliente existente</p>
+                                        <button onClick={() => { setClienteVinculado(null); setBuscarClienteVinc(''); }}
+                                            className="text-xs text-red-500 mt-1">× Quitar selección</button>
                                     </div>
                                 )}
 
                                 <div className="flex flex-col gap-2">
-                                    {/* Aprobar vinculando o creando */}
-                                    <button onClick={async () => {
-                                        let clienteId = clienteVinculado?.id || null;
+                                    <button onClick={async (e) => {
+                                        const btn = e.currentTarget;
+                                        btn.disabled = true;
+                                        btn.textContent = '⏳ Procesando...';
+                                        try {
+                                            let clienteId = clienteVinculado?.id || null;
 
-                                        // Si no vinculó, crear cliente nuevo
-                                        if (!clienteId) {
-                                            const { data: nuevo } = await supabaseClient.from('clientes').insert({
-                                                nombre: modalAprobar.nombre,
-                                                telefono: modalAprobar.telefono,
-                                                tipo_cliente: 'Individual',
-                                                activo: true
-                                            }).select();
-                                            clienteId = nuevo?.[0]?.id || null;
-                                        } else {
-                                            // Actualizar teléfono del cliente existente si no lo tiene
-                                            if (!clienteVinculado.telefono) {
-                                                await supabaseClient.from('clientes').update({ telefono: modalAprobar.telefono }).eq('id', clienteId);
+                                            if (!clienteId) {
+                                                const { data: nuevo, error: errNuevo } = await supabaseClient.from('clientes').insert({
+                                                    nombre: modalAprobar.nombre,
+                                                    telefono: modalAprobar.telefono,
+                                                    tipo_cliente: 'Individual',
+                                                    activo: true
+                                                }).select();
+                                                if (errNuevo) { pushToast('Error al crear cliente: ' + errNuevo.message, 'error'); btn.disabled = false; btn.textContent = '✅ Aprobar'; return; }
+                                                clienteId = nuevo?.[0]?.id || null;
+                                            } else {
+                                                if (!clienteVinculado.telefono) {
+                                                    await supabaseClient.from('clientes').update({ telefono: modalAprobar.telefono }).eq('id', clienteId);
+                                                }
                                             }
+
+                                            const { error: errPortal } = await supabaseClient.from('clientes_portal').update({
+                                                estado: 'aprobado',
+                                                cliente_id: clienteId
+                                            }).eq('id', modalAprobar.id);
+
+                                            if (errPortal) { pushToast('Error al aprobar: ' + errPortal.message, 'error'); btn.disabled = false; return; }
+
+                                            pushToast('✅ Cliente aprobado');
+                                            enviarNotifLocal('✅ Cliente aprobado', modalAprobar.nombre + ' ya puede acceder al portal');
+
+                                            // Notificar por WhatsApp — limpiar teléfono y agregar 57
+                                            const telLimpio = modalAprobar.telefono.replace(/\D/g, '');
+                                            const telFinal = telLimpio.startsWith('57') ? telLimpio : '57' + telLimpio;
+                                            const msg = `¡Hola ${modalAprobar.nombre}! 🎉 Tu cuenta en el portal de Arepas al Carbón fue aprobada. Ya puedes ingresar con tu número. ¡Bienvenido! 🫓`;
+                                            window.open(`https://wa.me/${telFinal}?text=${encodeURIComponent(msg)}`, '_blank');
+
+                                            setModalAprobar(null);
+                                            setBuscarClienteVinc('');
+                                            setClienteVinculado(null);
+                                            await loadData(true);
+                                        } catch(err) {
+                                            pushToast('Error: ' + err.message, 'error');
+                                            btn.disabled = false;
                                         }
-
-                                        // Aprobar en portal
-                                        await supabaseClient.from('clientes_portal').update({
-                                            estado: 'aprobado',
-                                            cliente_id: clienteId
-                                        }).eq('id', modalAprobar.id);
-
-                                        enviarNotifLocal('✅ Cliente aprobado', modalAprobar.nombre + ' ya puede acceder al portal');
-                                        pushToast('✅ Cliente aprobado');
-
-                                        // Notificar por WhatsApp
-                                        const msg = `¡Hola ${modalAprobar.nombre}! 🎉 Tu cuenta en el portal de Arepas al Carbón fue aprobada. Ya puedes ingresar con tu número. ¡Bienvenido! 🫓`;
-                                        window.open(`https://wa.me/${modalAprobar.telefono}?text=${encodeURIComponent(msg)}`, '_blank');
-
-                                        setModalAprobar(null);
-                                        setBuscarClienteVinc('');
-                                        setClienteVinculado(null);
-                                        loadData();
                                     }}
-                                    className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-xl font-bold text-sm hover:from-green-600 hover:to-green-700 transition">
+                                    className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold text-sm hover:from-green-600 hover:to-green-700 transition">
                                         {clienteVinculado ? `✅ Aprobar y vincular con ${clienteVinculado.nombre}` : '✅ Aprobar y crear como nuevo cliente'}
                                     </button>
 
