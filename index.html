@@ -14,8 +14,8 @@
     <title>Arepas al Carbon </title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+   <script src="https://unpkg.com/@babel/standalone@7.26.0/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <style>
@@ -278,7 +278,7 @@
         }
     </script>
 
-    <script type="text/babel">
+   <script type="text/babel" data-compact="false">
         const { useState, useEffect, useMemo, useCallback } = React;
         const { createClient } = supabase;
         const SUPABASE_URL = 'https://xybyupmrtiyspxlzcaug.supabase.co';
@@ -865,8 +865,6 @@
             const toggleAcordeon = (key) => setAcordeonNegocio(prev => ({ ...prev, [key]: !prev[key] }));
             const [acordeonPortal, setAcordeonPortal] = useState({});
             const toggleAcordeonPortal = (key) => setAcordeonPortal(prev => ({ ...prev, [key]: !prev[key] }));
-            const [pushPermiso, setPushPermiso] = useState(null);
-            const [configNotif, setConfigNotif] = useState({ hora_inicio: '06:00', hora_fin: '21:00' });
             const [avisos, setAvisos] = useState([]);
             const [avisoForm, setAvisoForm] = useState({ id: null, mensaje: '', fecha_fin: '', hora_inicio: '', hora_fin: '' });
             const [configPuntos, setConfigPuntos] = useState({ monto_minimo: 12000, puntos_por_compra: 50, meses_vencimiento: 3 });
@@ -978,31 +976,7 @@
             const [modalEditarPedido, setModalEditarPedido] = useState(null);
             const [ventaProductoId, setVentaProductoId] = useState('');
 
-            // Solicitar permiso push
-            const solicitarPermisoPush = async () => {
-                if (!('Notification' in window)) { pushToast('Tu navegador no soporta notificaciones', 'error'); return; }
-                const permiso = await Notification.requestPermission();
-                setPushPermiso(permiso);
-                if (permiso === 'granted') pushToast('✅ Notificaciones activadas');
-                else pushToast('Notificaciones bloqueadas', 'error');
-            };
 
-            // Verificar si está en horario permitido
-            const enHorario = () => {
-                const ahora = new Date();
-                const actual = ahora.getHours() * 60 + ahora.getMinutes();
-                const [hiH, hiM] = (configNotif.hora_inicio || '06:00').split(':').map(Number);
-                const [hfH, hfM] = (configNotif.hora_fin || '21:00').split(':').map(Number);
-                return actual >= (hiH * 60 + hiM) && actual <= (hfH * 60 + hfM);
-            };
-
-            // Enviar notificación local
-            const enviarNotifLocal = (titulo, cuerpo) => {
-                if (!enHorario()) return;
-                if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                    new Notification(titulo, { body: cuerpo, icon: '/Arepas.png' });
-                }
-            };
 
             const pushToast = (msg, type = 'success') => { const id = Date.now() + Math.random(); const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'; setToasts(t => [...t, { id, message: msg, type, icon }]); setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 5000); };
             // Funciones para modales personalizados
@@ -1200,7 +1174,7 @@
 
             useEffect(() => {
                 checkUserAndLoad();
-                if ('Notification' in window) setPushPermiso(Notification.permission);
+                if ('Notification' in window);
             }, []);
 
             // Cargar datos para el portal del cliente
@@ -4917,108 +4891,6 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                     )}
                                 </div>
 
-                                {/* Notificaciones Push */}
-                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden border-t-4 border-amber-500`}>
-                                    <button onClick={() => toggleAcordeon('notif')}
-                                        className={`w-full flex justify-between items-center p-4 md:p-5 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
-                                        <h3 className="font-bold text-base md:text-lg flex items-center gap-2"><span>🔔</span> Notificaciones Push</h3>
-                                        <span className={`text-lg transition-transform duration-200 ${acordeonNegocio['notif'] ? 'rotate-180' : ''}`}>▼</span>
-                                    </button>
-                                    {acordeonNegocio['notif'] && (
-                                    <div className="px-4 pb-4 md:px-6 md:pb-6 space-y-3">
-                                        {/* Estado permiso */}
-                                        <div className={`p-3 rounded-xl flex justify-between items-center ${pushPermiso === 'granted' ? darkMode ? 'bg-green-900/30 border border-green-700' : 'bg-green-50 border border-green-300' : darkMode ? 'bg-yellow-900/30 border border-yellow-700' : 'bg-yellow-50 border border-yellow-300'}`}>
-                                            <div>
-                                                <p className={`text-sm font-bold ${pushPermiso === 'granted' ? 'text-green-600' : 'text-yellow-600'}`}>
-                                                    {pushPermiso === 'granted' ? '✅ Notificaciones activas' : '⚠️ Notificaciones desactivadas'}
-                                                </p>
-                                                <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                                    {pushPermiso === 'granted' ? 'Recibirás alertas de clientes y más' : 'Actívalas para recibir alertas'}
-                                                </p>
-                                            </div>
-                                            {pushPermiso !== 'granted' && (
-                                                <button onClick={solicitarPermisoPush}
-                                                    className="px-4 py-2 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition">
-                                                    Activar
-                                                </button>
-                                            )}
-                                        </div>
-                                        {/* Horario */}
-                                        <div>
-                                            <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>🕐 Horario de notificaciones</p>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <label className={`block text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Desde</label>
-                                                    <input type="time" value={configNotif.hora_inicio}
-                                                        onChange={e => setConfigNotif({...configNotif, hora_inicio: e.target.value})}
-                                                        className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
-                                                </div>
-                                                <div>
-                                                    <label className={`block text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Hasta</label>
-                                                    <input type="time" value={configNotif.hora_fin}
-                                                        onChange={e => setConfigNotif({...configNotif, hora_fin: e.target.value})}
-                                                        className={`w-full p-2 border-2 rounded-xl text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-200'}`} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {/* Prueba */}
-                                        <button onClick={() => {
-                                            if (pushPermiso !== 'granted') { pushToast('Primero activa las notificaciones', 'error'); return; }
-                                            enviarNotifLocal('🫓 Arepas al Carbón', 'Esta es una notificación de prueba');
-                                            pushToast('✅ Notificación enviada');
-                                        }} className={`w-full p-3 rounded-xl font-bold text-sm transition ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                                            🔔 Enviar notificación de prueba
-                                        </button>
-                                    </div>
-                                    )}
-                                </div>
-
-                                {/* Código QR */}
-                                <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden border-t-4 border-pink-500`}>
-                                    <button onClick={() => toggleAcordeon('qr')}
-                                        className={`w-full flex justify-between items-center p-4 md:p-5 text-left transition ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
-                                        <h3 className="font-bold text-base md:text-lg flex items-center gap-2"><span>📲</span> Código QR de la App</h3>
-                                        <span className={`text-lg transition-transform duration-200 ${acordeonNegocio['qr'] ? 'rotate-180' : ''}`}>▼</span>
-                                    </button>
-                                    {acordeonNegocio['qr'] && (
-                                    <div className="px-4 pb-6 md:px-6 flex flex-col items-center">
-                                        <p className={`text-sm mb-4 text-center ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                                            Comparte este QR con tus clientes para que accedan al portal
-                                        </p>
-                                        <div className="bg-white p-4 rounded-2xl shadow-lg">
-                                            <img
-                                                src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https://arepas-al-fuego.netlify.app/&color=78350f&bgcolor=ffffff&margin=10"
-                                                alt="QR Arepas al Carbón"
-                                                className="w-56 h-56"
-                                                id="qr-img"
-                                            />
-                                        </div>
-                                        <p className="text-xs text-gray-400 mt-2 mb-4">arepas-al-fuego.netlify.app</p>
-                                        <div className="flex gap-3 w-full">
-                                            <a href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=https://arepas-al-fuego.netlify.app/&color=78350f&bgcolor=ffffff&margin=10"
-                                                download="QR-Arepas-al-Carbon.png"
-                                                target="_blank"
-                                                onClick={() => pushToast('✅ Descargando QR...')}
-                                                className="flex-1 bg-gradient-to-r from-pink-500 to-pink-600 text-white p-3 rounded-xl font-bold text-sm hover:from-pink-600 hover:to-pink-700 transition flex items-center justify-center gap-2">
-                                                ⬇️ Descargar QR
-                                            </a>
-                                            <button onClick={() => {
-                                                const url = 'https://arepas-al-fuego.netlify.app/';
-                                                if (navigator.share) {
-                                                    navigator.share({ title: 'Portal Arepas al Carbón', text: '¡Regístrate en nuestro portal! 🫓', url })
-                                                        .catch(() => {});
-                                                } else {
-                                                    navigator.clipboard?.writeText(url).then(() => pushToast('✅ Link copiado'));
-                                                }
-                                            }}
-                                            className={`flex-1 p-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                                                📤 Compartir link
-                                            </button>
-                                        </div>
-                                    </div>
-                                    )}
-                                </div>
-
                                 {/* Avisos del día */}
                                 <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden border-t-4 border-orange-500`}>
                                     <button onClick={() => toggleAcordeon('avisos')}
@@ -7071,7 +6943,7 @@ Se ${esEntrada ? 'descontará' : 'devolverá'} esa cantidad al inventario.`,
                                             if (errPortal) { pushToast('Error al aprobar: ' + errPortal.message, 'error'); btn.disabled = false; return; }
 
                                             pushToast('✅ Cliente aprobado');
-                                            enviarNotifLocal('✅ Cliente aprobado', modalAprobar.nombre + ' ya puede acceder al portal');
+                                          
 
                                             // Notificar por WhatsApp — limpiar teléfono y agregar 57
                                             const telLimpio = modalAprobar.telefono.replace(/\D/g, '');
